@@ -39,7 +39,8 @@ MODULE = test_um_system
 else
 
 # Gate level simulation:
-SIM = icarus
+SIM=icarus
+FST=-fst
 TOPLEVEL_LANG = verilog
 SIM_BUILD				= sim_build/gl
 COMPILE_ARGS    += -DGL_TEST
@@ -47,15 +48,15 @@ COMPILE_ARGS    += -DFUNCTIONAL
 COMPILE_ARGS    += -DUSE_POWER_PINS
 COMPILE_ARGS    += -DSIM
 COMPILE_ARGS    += -DUNIT_DELAY=\#1
-VERILOG_SOURCES += $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/primitives.v
-VERILOG_SOURCES += $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v
+VERILOG_SOURCES += $(PDK_ROOT)/gf180mcuD/libs.ref/gf180mcu_fd_sc_mcu7t5v0/verilog/primitives.v
+VERILOG_SOURCES += $(PDK_ROOT)/gf180mcuD/libs.ref/gf180mcu_fd_sc_mcu7t5v0/verilog/gf180mcu_fd_sc_mcu7t5v0.v
 
 # this gets copied in by the GDS action workflow
 VERILOG_SOURCES += $(PWD)/gate_level_netlist.v
 
-#COMPILE_ARGS 		+= -I$(SRC_DIR)
+COMPILE_ARGS 		+= -I$(SRC_DIR)
 TOPLEVEL = tt_um_jpigdon_gps_accelerator_top
-MODULE = test_um_system
+#MODULE = test_um_system
 COCOTB_TEST_MODULES = test_um_system
 endif
 
