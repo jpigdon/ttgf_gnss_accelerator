@@ -14,7 +14,7 @@ jobs:
           submodules: recursive
 
       - name: Build GDS
-        uses: TinyTapeout/tt-gds-action@ttgf26a
+        uses: jpigdon/tt-gds-action@ttsky26bvhdl3
         with:
           pdk: gf180mcuD
 
