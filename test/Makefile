@@ -12,10 +12,10 @@ ifneq ($(GATES),yes)
 SIM=ghdl
 SIM_BUILD				= sim_build/rtl
 COMPILE_ARGS := --std=08
-#SIM_ARGS +=--std=08
-#SIM_ARGS += --wave=nvcsim.fst
-TOPLEVEL_LANG ?= vhdl
-VHDL_SOURCES = $(SRC_DIR)/tt_um_jpigdon_gps_accelerator_top.vhdl
+GHDL_ARGS +=--std=08
+SIM_ARGS += --fst=tb.fst
+TOPLEVEL_LANG = vhdl
+VHDL_SOURCES += $(SRC_DIR)/tt_um_jpigdon_gps_accelerator_top.vhdl
 VHDL_SOURCES += $(SRC_DIR)/gold_code_gen.vhdl
 VHDL_SOURCES += $(SRC_DIR)/bidir_complex_nco_1b.vhdl
 VHDL_SOURCES += $(SRC_DIR)/biphase_accu_and_dump.vhdl
@@ -34,7 +34,7 @@ VHDL_SOURCES += $(SRC_DIR)/spi_control_if.vhdl
 #TOPLEVEL = control_system
 #MODULE = test_control_system
 TOPLEVEL = tt_um_jpigdon_gps_accelerator_top
-MODULE = test_um_system
+COCOTB_TEST_MODULES = test_um_system
 
 else
 
@@ -48,8 +48,8 @@ COMPILE_ARGS    += -DFUNCTIONAL
 COMPILE_ARGS    += -DUSE_POWER_PINS
 COMPILE_ARGS    += -DSIM
 COMPILE_ARGS    += -DUNIT_DELAY=\#1
-VERILOG_SOURCES += $(PDK_ROOT)/gf180mcuD/libs.ref/gf180mcu_fd_sc_mcu7t5v0/verilog/primitives.v
-VERILOG_SOURCES += $(PDK_ROOT)/gf180mcuD/libs.ref/gf180mcu_fd_sc_mcu7t5v0/verilog/gf180mcu_fd_sc_mcu7t5v0.v
+VERILOG_SOURCES += /home/vscode/ttsetup/pdk/ciel/gf180mcu/versions/54435919abffb937387ec956209f9cf5fd2dfbee/gf180mcuD/libs.ref/gf180mcu_fd_sc_mcu7t5v0/verilog/primitives.v
+VERILOG_SOURCES += /home/vscode/ttsetup/pdk/ciel/gf180mcu/versions/54435919abffb937387ec956209f9cf5fd2dfbee/gf180mcuD/libs.ref/gf180mcu_fd_sc_mcu7t5v0/verilog/gf180mcu_fd_sc_mcu7t5v0.v
 
 # this gets copied in by the GDS action workflow
 VERILOG_SOURCES += $(PWD)/gate_level_netlist.v

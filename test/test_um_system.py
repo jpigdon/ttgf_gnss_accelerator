@@ -27,7 +27,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
     dut.uio_in.value = uin_val
 
     for j in range(num_transactions):
-        await Timer(delay_ns[j], units='ns')
+        await Timer(delay_ns[j], unit='ns')
         uin_val = 0x02
 
         #print("Sending: "+ str(hex(word_to_send[j])))
@@ -39,14 +39,14 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
         dut.uio_in.value = uin_val
 
-        await Timer(1.5*SPI_PERIOD_NS, units='ns')
+        await Timer(1.5*SPI_PERIOD_NS, unit='ns')
         for i in range(31):
         #     #set the bit
-            await Timer(SPI_PERIOD_NS/2, units='ns')
+            await Timer(SPI_PERIOD_NS/2, unit='ns')
             uin_val = uin_val | (1 << 3)
             dut.uio_in.value = uin_val
 
-            await Timer(SPI_PERIOD_NS/2, units='ns')
+            await Timer(SPI_PERIOD_NS/2, unit='ns')
             uin_val = uin_val & 0xF7
 
             if(((word_to_send[j] >> 31-i-1) & 1) == 1):
@@ -56,14 +56,16 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
             dut.uio_in.value = uin_val
 
-        await Timer(1.5*SPI_PERIOD_NS, units='ns')
+        await Timer(1.5*SPI_PERIOD_NS, unit='ns')
         uin_val = uin_val | 0x01
         dut.uio_in.value = uin_val
     
     while True:
-        await Edge(dut.uo_out)
+        await dut.uo_out.value_change
+        #await Edge(dut.uo_out)
         for j in range(num_read_ops):
-            await Timer(read_op_delays[j], units='ns')
+            read_op_val = 0x00000000
+            await Timer(read_op_delays[j], unit='ns')
             uin_val = 0x02
 
             if(((read_op_words[j] >> 31) & 1) == 1):
@@ -73,15 +75,17 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
             dut.uio_in.value = uin_val
 
-            await Timer(1.5*SPI_PERIOD_NS, units='ns')
+            await Timer(1.5*SPI_PERIOD_NS, unit='ns')
             for i in range(31):
             #     #set the bit
-                await Timer(SPI_PERIOD_NS/2, units='ns')
+                await Timer(SPI_PERIOD_NS/2, unit='ns')
                 uin_val = uin_val | (1 << 3)
                 dut.uio_in.value = uin_val
+                #clock goes high
+                read_op_val = (read_op_val << 1) | ((int(dut.uio_out.value) >> 2) & 0x01)
 
-                await Timer(SPI_PERIOD_NS/2, units='ns')
-                uin_val = uin_val & 0xF7
+                await Timer(SPI_PERIOD_NS/2, unit='ns')
+                uin_val = uin_val & 0xF7 #clock goes low
 
                 if(((read_op_words[j] >> 31-i-1) & 1) == 1):
                     uin_val = uin_val | (1 << 1)
@@ -90,11 +94,12 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
                 dut.uio_in.value = uin_val
 
-            await Timer(1.5*SPI_PERIOD_NS, units='ns')
+            await Timer(1.5*SPI_PERIOD_NS, unit='ns')
             uin_val = uin_val | 0x01
             dut.uio_in.value = uin_val
+            print(f"Readback for operation {hex(read_op_words[j])} was {hex(read_op_val)}")
         
-        await Timer(read_op_delays[0], units='ns')
+        await Timer(read_op_delays[0], unit='ns')
         uin_val = 0x02
 
         if(((0x80000100 >> 31) & 1) == 1):
@@ -104,14 +109,14 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
         dut.uio_in.value = uin_val
 
-        await Timer(1.5*SPI_PERIOD_NS, units='ns')
+        await Timer(1.5*SPI_PERIOD_NS, unit='ns')
         for i in range(31):
         #     #set the bit
-            await Timer(SPI_PERIOD_NS/2, units='ns')
+            await Timer(SPI_PERIOD_NS/2, unit='ns')
             uin_val = uin_val | (1 << 3)
             dut.uio_in.value = uin_val
 
-            await Timer(SPI_PERIOD_NS/2, units='ns')
+            await Timer(SPI_PERIOD_NS/2, unit='ns')
             uin_val = uin_val & 0xF7
 
             if(((0x80000100 >> 31-i-1) & 1) == 1):
@@ -121,7 +126,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
             dut.uio_in.value = uin_val
 
-        await Timer(1.5*SPI_PERIOD_NS, units='ns')
+        await Timer(1.5*SPI_PERIOD_NS, unit='ns')
         uin_val = uin_val | 0x01
         dut.uio_in.value = uin_val
 
@@ -144,7 +149,7 @@ async def test_um_system(dut):
     delays = [5000, 5000, 5000, 5000, 5000]
     transactions = [ 0x81000000 | (taps << 8), 0x82FFFE00, 0x83000100, 0x84000300, 0x80000200]
 
-    clock = Clock(dut.clk, int((1/4.092)*1000000), units="ps")
+    clock = Clock(dut.clk, int(((1/4.092)*1000000)/2)*2, unit="ps") #force divisible by two
     cocotb.start_soon(clock.start())
     spi_task = cocotb.start_soon(spi_operation(dut, num_transactions=5, delay_ns=delays, word_to_send=transactions))
 

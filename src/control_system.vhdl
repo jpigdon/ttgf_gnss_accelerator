@@ -67,7 +67,7 @@ architecture Behavioral of control_system is
     constant ACQ_Q_VAL_ADDR : integer := 6;
     constant ACQ_CURR_PINC_ADDR : integer := 7;
     constant ACQ_CURR_TIME_ADDR : integer := 8;
-
+    constant TRK_CONFIG_ADDR : integer := 9;
     constant TRK_BASE_ADDR : integer := 10;
     constant TRK_CH_INC : integer := 6;
     constant TRK_TIME_OFFSET : integer := 0;
