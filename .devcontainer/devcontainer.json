@@ -15,7 +15,7 @@
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
       },
-      "extensions": ["mshr-h.veriloghdl", "surfer-project.surfer"]
+      "extensions": ["mshr-h.veriloghdl", "lramseyer.vaporview"]
     }
   },
   "features": {

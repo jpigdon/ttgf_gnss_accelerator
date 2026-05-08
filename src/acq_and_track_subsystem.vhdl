@@ -5,6 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity acq_and_track_subsystem is
     generic(
         OVERSAMPLE_RATIO : integer := 4;
+        TRACK_LEN_WIDTH : integer := 2;
         ACCU_WIDTH : integer := 16;
         ACCU_OUTPUT_WIDTH : integer := 16;
         MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -37,6 +38,7 @@ entity acq_and_track_subsystem is
 
         track_channel_en : in std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
         track_channel_update : in std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
+        track_len_slv : in std_logic_vector((NUM_TRACK_CHANNELS*TRACK_LEN_WIDTH)-1 downto 0);
 
         track_i_accu_val : out std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
         track_q_accu_val : out std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
@@ -92,6 +94,7 @@ architecture Behavioral of acq_and_track_subsystem is
     component track_mgmt_sm is
     generic(
         OVERSAMPLE_RATIO : integer := 4;
+        TRACK_LEN_WIDTH : integer := 2;
         ACCU_WIDTH : integer := 16;
         ACCU_OUTPUT_WIDTH : integer := 8;
         MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -105,7 +108,8 @@ architecture Behavioral of acq_and_track_subsystem is
         i_chan : in std_logic;
         q_chan : in std_logic;
 
-        trk_begin : in std_logic;
+        trk_en : in std_logic;
+        trk_len_slv : in std_logic_vector(TRACK_LEN_WIDTH-1 downto 0); 
         trk_update : in std_logic;
         timing_period_strobe : in std_logic;
 
@@ -207,6 +211,7 @@ begin
     trk_mgr : track_mgmt_sm
         generic map (
             OVERSAMPLE_RATIO => OVERSAMPLE_RATIO,
+            TRACK_LEN_WIDTH => TRACK_LEN_WIDTH,
             ACCU_WIDTH => ACCU_WIDTH,
             ACCU_OUTPUT_WIDTH => ACCU_OUTPUT_WIDTH,
             MASTER_COUNT_WIDTH_INT => MASTER_COUNT_WIDTH_INT,
@@ -220,7 +225,8 @@ begin
             i_chan => i_chan,
             q_chan => q_chan,
 
-            trk_begin => track_channel_en(i),
+            trk_en => track_channel_en(i),
+            trk_len_slv => track_len_slv(((i+1)*TRACK_LEN_WIDTH)-1 downto (i*TRACK_LEN_WIDTH)),
             trk_update => track_channel_update(i),
             timing_period_strobe => timing_period_strobe,
 

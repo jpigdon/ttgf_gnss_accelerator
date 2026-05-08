@@ -20,6 +20,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
     constant INPUT_DATA_WIDTH : integer := 16;
     constant ADDR_WIDTH : integer := 5;
     constant OVERSAMPLE_RATIO : integer := 4;
+    constant TRACK_LEN_WIDTH : integer := 2;
     constant ACCU_WIDTH : integer := 16;
     constant ACCU_OUTPUT_WIDTH : integer := 16;
     constant MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -37,6 +38,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
         ADDR_WIDTH : integer := 6;
 
         OVERSAMPLE_RATIO : integer := 4;
+        TRACK_LEN_WIDTH : integer := 2;
         ACCU_WIDTH : integer := 16;
         ACCU_OUTPUT_WIDTH : integer := 16;
         MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -71,6 +73,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
         acq_q_accu_val : in std_logic_vector(ACCU_OUTPUT_WIDTH-1 downto 0);
 
         track_channel_en : out std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
+        track_len_slv : out std_logic_vector((NUM_TRACK_CHANNELS*TRACK_LEN_WIDTH)-1 downto 0);
         track_channel_update : out std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
 
         track_i_accu_val : in std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
@@ -88,6 +91,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
     component acq_and_track_subsystem is
     generic(
         OVERSAMPLE_RATIO : integer := 4;
+        TRACK_LEN_WIDTH : integer := 2;
         ACCU_WIDTH : integer := 16;
         ACCU_OUTPUT_WIDTH : integer := 16;
         MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -119,6 +123,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
         q_accu_val : out std_logic_vector(ACCU_OUTPUT_WIDTH-1 downto 0);
 
         track_channel_en : in std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
+        track_len_slv : in std_logic_vector((NUM_TRACK_CHANNELS*TRACK_LEN_WIDTH)-1 downto 0);
         track_channel_update : in std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
 
         track_i_accu_val : out std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
@@ -154,6 +159,8 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
     signal acq_q_accu_val :  std_logic_vector(ACCU_OUTPUT_WIDTH-1 downto 0);
 
     signal track_channel_en : std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
+    signal track_len_slv : std_logic_vector((NUM_TRACK_CHANNELS*TRACK_LEN_WIDTH)-1 downto 0);
+
     signal track_channel_update : std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
 
     signal track_i_accu_val : std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
@@ -191,7 +198,8 @@ begin
         OUTPUT_DATA_WIDTH => OUTPUT_DATA_WIDTH,
         INPUT_DATA_WIDTH => INPUT_DATA_WIDTH,
         ADDR_WIDTH => ADDR_WIDTH,
-        OVERSAMPLE_RATIO => ADDR_WIDTH,
+        OVERSAMPLE_RATIO => OVERSAMPLE_RATIO,
+        TRACK_LEN_WIDTH => TRACK_LEN_WIDTH,
         ACCU_WIDTH => ACCU_WIDTH,
         ACCU_OUTPUT_WIDTH =>ACCU_OUTPUT_WIDTH,
         MASTER_COUNT_WIDTH_INT => MASTER_COUNT_WIDTH_INT,
@@ -226,6 +234,7 @@ begin
         acq_q_accu_val => acq_q_accu_val,
 
         track_channel_en => track_channel_en,
+        track_len_slv => track_len_slv,
         track_channel_update => track_channel_update,
         track_i_accu_val => track_i_accu_val,
         track_q_accu_val => track_q_accu_val,
@@ -240,6 +249,7 @@ begin
     acq_trk : acq_and_track_subsystem
         generic map(
             OVERSAMPLE_RATIO => OVERSAMPLE_RATIO,
+            TRACK_LEN_WIDTH => TRACK_LEN_WIDTH,
             ACCU_WIDTH => ACCU_WIDTH,
             ACCU_OUTPUT_WIDTH => ACCU_OUTPUT_WIDTH,
             MASTER_COUNT_WIDTH_INT =>  MASTER_COUNT_WIDTH_INT,
@@ -271,6 +281,7 @@ begin
             q_accu_val => acq_q_accu_val,
 
             track_channel_en => track_channel_en,
+            track_len_slv => track_len_slv,
             track_channel_update => track_channel_update,
             track_i_accu_val => track_i_accu_val,
             track_q_accu_val => track_q_accu_val,

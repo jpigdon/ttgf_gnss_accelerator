@@ -5,6 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity track_mgmt_sm is
     generic(
         OVERSAMPLE_RATIO : integer := 4;
+        TRACK_LEN_WIDTH : integer := 2;
         ACCU_WIDTH : integer := 16;
         ACCU_OUTPUT_WIDTH : integer := 8;
         MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -18,7 +19,8 @@ entity track_mgmt_sm is
         i_chan : in std_logic;
         q_chan : in std_logic;
 
-        trk_begin : in std_logic;
+        trk_en : in std_logic;
+        trk_len_slv : in std_logic_vector(TRACK_LEN_WIDTH-1 downto 0); 
         trk_update : in std_logic;
         timing_period_strobe : in std_logic;
 
@@ -229,7 +231,7 @@ begin
             ph_inc_load <= '0';
             case trk_state is
                 when WAITING =>
-                    if( trk_begin = '1') then
+                    if( trk_en = '1') then
                         trk_state <= PREPARING;
                                                 --ph_inc_reg <= phase_inc_step;
                         ph_inc_load <= '1';

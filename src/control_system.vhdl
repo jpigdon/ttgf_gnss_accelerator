@@ -7,8 +7,8 @@ entity control_system is
         OUTPUT_DATA_WIDTH : integer := 16;
         INPUT_DATA_WIDTH : integer := 16;
         ADDR_WIDTH : integer := 6;
-
         OVERSAMPLE_RATIO : integer := 4;
+        TRACK_LEN_WIDTH : integer := 2;
         ACCU_WIDTH : integer := 16;
         ACCU_OUTPUT_WIDTH : integer := 16;
         MASTER_COUNT_WIDTH_INT : integer := 10;
@@ -44,6 +44,8 @@ entity control_system is
 
         track_channel_en : out std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
         track_channel_update : out std_logic_vector(NUM_TRACK_CHANNELS-1 downto 0);
+        track_len_slv : out std_logic_vector((NUM_TRACK_CHANNELS*TRACK_LEN_WIDTH)-1 downto 0); 
+
 
         track_i_accu_val : in std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
         track_q_accu_val : in std_logic_vector((NUM_TRACK_CHANNELS *3* ACCU_OUTPUT_WIDTH)-1 downto 0);
@@ -86,6 +88,12 @@ architecture Behavioral of control_system is
     constant COMMAND_ADDR_ACQ_BEGIN_POS : integer := 1;
     constant COMMAND_ADDR_INT_CLR_POS : integer := 0;
 
+    constant TRACK_CONFIG_REG_EN_BIT : integer := 0;
+    constant TRACK_CONFIG_REG_UPDATE_BIT : integer := 1;
+    constant TRACK_CONFIG_REG_LEN_TOP : integer := 3;
+    constant TRACK_CONFIG_REG_LEN_BOTTOM : integer := 2;
+    constant TRACK_CONFIG_REG_CH_STRIDE : integer := 4;
+
     component spi_control_if is
     generic(
         OUTPUT_DATA_WIDTH : integer := 16;
@@ -122,6 +130,7 @@ architecture Behavioral of control_system is
     signal acq_phase_inc_count_reg : std_logic_vector(PHASE_COUNT_WIDTH-1 downto 0);
     signal acq_sv_test_taps_reg:  std_logic_vector(GPS_GOLD_TAPS_WIDTH-1 downto 0);
 
+    signal trk_channel_config_reg : std_logic_vector((NUM_TRACK_CHANNELS*TRACK_CONFIG_REG_CH_STRIDE-1)-1 downto 0);
     signal track_phase_inc_reg: std_logic_vector((NUM_TRACK_CHANNELS * PHASE_INC_WIDTH)-1 downto 0);
     signal track_time_reg : std_logic_vector(NUM_TRACK_CHANNELS*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC)-1 downto 0);
     signal track_sv_reg: std_logic_vector((NUM_TRACK_CHANNELS*GPS_GOLD_TAPS_WIDTH)-1 downto 0);
@@ -157,6 +166,10 @@ begin
     acq_phase_inc_step <= acq_phase_inc_step_reg;
     acq_phase_inc_count <= acq_phase_inc_count_reg;
     acq_sv_test_taps <= acq_sv_test_taps_reg;
+    track_cfg : for i in 0 to NUM_TRACK_CHANNELS-1 generate
+        track_channel_en(i) <= trk_channel_config_reg((TRACK_CONFIG_REG_CH_STRIDE-1)*i);
+        track_len_slv((TRACK_LEN_WIDTH*(i+1))-1 downto i*TRACK_LEN_WIDTH) <=  trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-TRACK_LEN_WIDTH);
+    end generate track_cfg;
     time_interrupt <= interrupt_flag_int;
 
     spi_read_op_data <= x"0000" when to_integer(signed(spi_op_addr_reg)) = COMMAND_ADDR else
@@ -210,12 +223,15 @@ begin
             acq_phase_inc_count_reg <= (others => '0');
             acq_sv_test_taps_reg <= (others => '0');
             spi_op_addr_reg <= (others => '0');
+            trk_channel_config_reg <= (others => '0');
             interrupt_flag_int <= '0';
             spi_read_update_strobe <= '0';
             acq_begin <= '0';
+            track_channel_update <= (others => '0');
         elsif(rising_edge(clk)) then
             acq_begin <= '0';
             spi_read_update_strobe <= '0';
+            track_channel_update <= (others => '0');
             if(time_pulse = '1') then
                 interrupt_flag_int <= '1';
             end if;
@@ -237,6 +253,15 @@ begin
                     acq_phase_inc_step_reg <= spi_write_op_data(PHASE_INC_WIDTH-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = ACQ_PH_COUNT_ADDR) then
                     acq_phase_inc_count_reg <= spi_write_op_data(PHASE_COUNT_WIDTH-1 downto 0);
+                elsif(to_integer(signed(spi_op_addr)) = TRK_CONFIG_ADDR) then
+                    for i in 0 to NUM_TRACK_CHANNELS-1 loop
+                        --update the enable flag
+                        trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i)) <= spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*i));
+                        if spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*i)+1) = '1' then
+                            track_channel_update(i) <= '1';
+                            trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i)+TRACK_CONFIG_REG_LEN_TOP-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*i)+TRACK_CONFIG_REG_LEN_BOTTOM-1) <= spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*i)+TRACK_CONFIG_REG_LEN_TOP downto (TRACK_CONFIG_REG_CH_STRIDE*i)+TRACK_CONFIG_REG_LEN_BOTTOM);
+                        end if; 
+                    end loop;
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_TIME_OFFSET) then
                     track_time_reg(((0+1)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))-1 downto ((0)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))) <= spi_write_op_data((MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_TIME_OFFSET) then
@@ -262,5 +287,6 @@ begin
             end if;
         end if;
     end process;
+
 
 end Behavioral;
