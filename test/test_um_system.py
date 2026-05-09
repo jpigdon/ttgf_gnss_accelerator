@@ -63,6 +63,11 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
     while True:
         await dut.uo_out.value_change
         #await Edge(dut.uo_out)
+        readback_idx = 0
+        readback_ph_step = 0
+        readback_ival = 0
+        readback_qval = 0
+        readback_magsq = 0
         for j in range(num_read_ops):
             read_op_val = 0x00000000
             await Timer(read_op_delays[j], unit='ns')
@@ -97,7 +102,21 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
             await Timer(1.5*SPI_PERIOD_NS, unit='ns')
             uin_val = uin_val | 0x01
             dut.uio_in.value = uin_val
-            print(f"Readback for operation {hex(read_op_words[j])} was {hex(read_op_val)}")
+            if(read_op_words[j] == 0x05000000):
+                readback_ival = int.from_bytes(((read_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
+            elif(read_op_words[j] == 0x06000000):
+                readback_qval = int.from_bytes(((read_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
+            elif(read_op_words[j] == 0x07000000):
+                readback_ph_step = read_op_val
+            else:
+                readback_magsq = readback_ival*readback_ival + readback_qval*readback_qval
+                readback_idx = read_op_val & 0x000003FF
+                print(f"Max for idx {readback_idx} was {readback_magsq}")
+                
+
+            
+
+            
         
         await Timer(read_op_delays[0], unit='ns')
         uin_val = 0x02
@@ -165,7 +184,7 @@ async def test_um_system(dut):
     await reset(dut)
     await RisingEdge(dut.clk)
         
-    for test_count in range(1023*4*32):
+    for test_count in range(1023*4*1028):
 
         await RisingEdge(dut.clk)
         uin_val = 0x00

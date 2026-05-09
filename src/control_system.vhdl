@@ -88,8 +88,9 @@ architecture Behavioral of control_system is
     constant COMMAND_ADDR_ACQ_BEGIN_POS : integer := 1;
     constant COMMAND_ADDR_INT_CLR_POS : integer := 0;
 
-    constant TRACK_CONFIG_REG_EN_BIT : integer := 0;
-    constant TRACK_CONFIG_REG_UPDATE_BIT : integer := 1;
+    constant TRACK_CONFIG_REG_UPDATE_BIT : integer := 0;
+    constant TRACK_CONFIG_REG_EN_BIT : integer := 1;
+    
     constant TRACK_CONFIG_REG_LEN_TOP : integer := 3;
     constant TRACK_CONFIG_REG_LEN_BOTTOM : integer := 2;
     constant TRACK_CONFIG_REG_CH_STRIDE : integer := 4;
@@ -130,7 +131,7 @@ architecture Behavioral of control_system is
     signal acq_phase_inc_count_reg : std_logic_vector(PHASE_COUNT_WIDTH-1 downto 0);
     signal acq_sv_test_taps_reg:  std_logic_vector(GPS_GOLD_TAPS_WIDTH-1 downto 0);
 
-    signal trk_channel_config_reg : std_logic_vector((NUM_TRACK_CHANNELS*TRACK_CONFIG_REG_CH_STRIDE-1)-1 downto 0);
+    signal trk_channel_config_reg : std_logic_vector((NUM_TRACK_CHANNELS*(TRACK_CONFIG_REG_CH_STRIDE-1))-1 downto 0);
     signal track_phase_inc_reg: std_logic_vector((NUM_TRACK_CHANNELS * PHASE_INC_WIDTH)-1 downto 0);
     signal track_time_reg : std_logic_vector(NUM_TRACK_CHANNELS*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC)-1 downto 0);
     signal track_sv_reg: std_logic_vector((NUM_TRACK_CHANNELS*GPS_GOLD_TAPS_WIDTH)-1 downto 0);
@@ -166,9 +167,14 @@ begin
     acq_phase_inc_step <= acq_phase_inc_step_reg;
     acq_phase_inc_count <= acq_phase_inc_count_reg;
     acq_sv_test_taps <= acq_sv_test_taps_reg;
+    
+    track_phase_inc <= track_phase_inc_reg;
+    track_time <= track_time_reg;
+    track_sv <= track_sv_reg;
+
     track_cfg : for i in 0 to NUM_TRACK_CHANNELS-1 generate
-        track_channel_en(i) <= trk_channel_config_reg((TRACK_CONFIG_REG_CH_STRIDE-1)*i);
-        track_len_slv((TRACK_LEN_WIDTH*(i+1))-1 downto i*TRACK_LEN_WIDTH) <=  trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-TRACK_LEN_WIDTH);
+       track_channel_en(i) <= trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i));
+       track_len_slv((TRACK_LEN_WIDTH*(i+1))-1 downto i*TRACK_LEN_WIDTH) <=  trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-TRACK_LEN_WIDTH);
     end generate track_cfg;
     time_interrupt <= interrupt_flag_int;
 
@@ -177,28 +183,28 @@ begin
                         x"00" & acq_phase_inc_start_reg when to_integer(signed(spi_op_addr_reg)) = ACQ_PH_START_ADDR else
                         x"00" & acq_phase_inc_step_reg when to_integer(signed(spi_op_addr_reg)) = ACQ_PH_INC_ADDR else
                         x"00" & acq_phase_inc_count_reg when to_integer(signed(spi_op_addr_reg)) = ACQ_PH_COUNT_ADDR else
-                        acq_i_accu_val when to_integer(signed(spi_op_addr_reg)) = ACQ_I_VAL_ADDR else
-                        acq_q_accu_val when to_integer(signed(spi_op_addr_reg)) = ACQ_Q_VAL_ADDR else
+                        "0000" & acq_i_accu_val when to_integer(signed(spi_op_addr_reg)) = ACQ_I_VAL_ADDR else
+                        "0000" & acq_q_accu_val when to_integer(signed(spi_op_addr_reg)) = ACQ_Q_VAL_ADDR else
                         x"00" & acq_curr_ph_inc_test when to_integer(signed(spi_op_addr_reg)) = ACQ_CURR_PINC_ADDR else
                         "000000" & acq_curr_time_offset_test when to_integer(signed(spi_op_addr_reg)) = ACQ_CURR_TIME_ADDR else
-                        track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_EARLY_OFFSET else
-                        track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_EARLY_OFFSET else
-                        track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_MID_OFFSET else
-                        track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_MID_OFFSET else
-                        track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_LATE_OFFSET else
-                        track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_LATE_OFFSET else
-                        track_i_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_I_EARLY_OFFSET else
-                        track_q_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_Q_EARLY_OFFSET else
-                        track_i_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_I_MID_OFFSET else
-                        track_q_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_Q_MID_OFFSET else
-                        track_i_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_I_LATE_OFFSET else
-                        track_q_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_Q_LATE_OFFSET else
-                        track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_EARLY_OFFSET else
-                        track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_EARLY_OFFSET else
-                        track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_MID_OFFSET else
-                        track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_MID_OFFSET else
-                        track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_LATE_OFFSET else
-                        track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_LATE_OFFSET else
+                        "0000" & track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_EARLY_OFFSET else
+                        "0000" & track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_EARLY_OFFSET else
+                        "0000" & track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_MID_OFFSET else
+                        "0000" & track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_MID_OFFSET else
+                        "0000" & track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_LATE_OFFSET else
+                        "0000" & track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_LATE_OFFSET else
+                        "0000" & track_i_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_I_EARLY_OFFSET else
+                        "0000" & track_q_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_Q_EARLY_OFFSET else
+                        "0000" & track_i_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_I_MID_OFFSET else
+                        "0000" & track_q_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_Q_MID_OFFSET else
+                        "0000" & track_i_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_I_LATE_OFFSET else
+                        "0000" & track_q_accu_val((1+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (1+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_Q_LATE_OFFSET else
+                        "0000" & track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_EARLY_OFFSET else
+                        "0000" & track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_EARLY_OFFSET else
+                        "0000" & track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_MID_OFFSET else
+                        "0000" & track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_MID_OFFSET else
+                        "0000" & track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_LATE_OFFSET else
+                        "0000" & track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_LATE_OFFSET else
                         
                         -- "0000" & track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_EARLY_OFFSET else
                         -- "0000" & track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_EARLY_OFFSET else
@@ -224,6 +230,9 @@ begin
             acq_sv_test_taps_reg <= (others => '0');
             spi_op_addr_reg <= (others => '0');
             trk_channel_config_reg <= (others => '0');
+            track_phase_inc_reg <= (others => '0');
+            track_time_reg <= (others => '0');
+            track_sv_reg <= (others => '0');
             interrupt_flag_int <= '0';
             spi_read_update_strobe <= '0';
             acq_begin <= '0';
@@ -255,11 +264,13 @@ begin
                     acq_phase_inc_count_reg <= spi_write_op_data(PHASE_COUNT_WIDTH-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_CONFIG_ADDR) then
                     for i in 0 to NUM_TRACK_CHANNELS-1 loop
-                        --update the enable flag
-                        trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i)) <= spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*i));
+                        --only update the channels that are flagged for updates. 
                         if spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*i)+1) = '1' then
                             track_channel_update(i) <= '1';
-                            trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i)+TRACK_CONFIG_REG_LEN_TOP-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*i)+TRACK_CONFIG_REG_LEN_BOTTOM-1) <= spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*i)+TRACK_CONFIG_REG_LEN_TOP downto (TRACK_CONFIG_REG_CH_STRIDE*i)+TRACK_CONFIG_REG_LEN_BOTTOM);
+                            trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i))) <= spi_write_op_data((TRACK_CONFIG_REG_CH_STRIDE*(i+1)-1) downto (TRACK_CONFIG_REG_CH_STRIDE*(i))+1);
+                        else
+                            track_channel_update(i) <= '0';
+                            trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i))) <= trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i)));
                         end if; 
                     end loop;
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_TIME_OFFSET) then

@@ -54,7 +54,6 @@ architecture Behavioral of track_mgmt_sm is
     signal gold_ena : std_logic;
 
     signal time_match_frac : std_logic_vector(MASTER_COUNT_WIDTH_FRAC-1 downto 0);
-    signal ph_inc :  std_logic_vector(PHASE_INC_WIDTH-1 downto 0);
     signal ph_inc_load :  std_logic;
     signal nco_ena :  std_logic;
 
@@ -125,7 +124,7 @@ begin
             gold_sync => gold_sync,
             gold_ena => gold_ena,
             
-            ph_inc_slv => ph_inc,
+            ph_inc_slv => phase_inc,
             ph_inc_load => ph_inc_load,
             nco_reset => reset,
             nco_ena => nco_ena,
