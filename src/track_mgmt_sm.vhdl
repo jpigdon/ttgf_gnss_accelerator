@@ -131,7 +131,7 @@ begin
             accu_sync => accu_sync,
             accu_ena  => accu_ena,
             accu_sr_ena => accu_sr_ena,
-            accu_sr_sel => "00",
+            accu_sr_sel => "01",
             i_accu_e_val => i_accu_val_e,
             q_accu_e_val => q_accu_val_e,
             i_accu_m_val => i_accu_val_m,
@@ -143,10 +143,24 @@ begin
         );
 
 
-    process(trk_state, time_match_frac) is
+    gold_load <= '0';
+
+    process(trk_state)
     begin
         case trk_state is
-            when TRACKING=>
+            when WAITING=>
+                trk_busy <= '0';
+            when others=>
+                trk_busy <= '1';
+        end case;
+    end process;
+
+
+
+    process(trk_state, time_match_frac, master_timing_slv) is
+    begin
+        case trk_state is
+            when PREROLLING | TRACKING=>
                 if(time_match_frac = master_timing_slv(MASTER_COUNT_WIDTH_FRAC-1 downto 0)) then
                     gold_ena <= '1';
                     gold_ena <= '1';
@@ -160,36 +174,21 @@ begin
         end case;
     end process;
 
-    -- process(acq_state, timing_period_strobe, gold_sel, timing_int_part, timing_frac_part, time_search_step) is
-    -- begin
-    --     case acq_state is
-    --         when TRIGGERED_WAIT_SOF =>
-    --             gold_a_sync <= timing_period_strobe;
-    --             gold_b_sync <= '0';
-    --         when ACQUIRING=>
-    --             if(to_integer(unsigned(timing_frac_part)) = OVERSAMPLE_RATIO-1) then
-    --                 if(to_integer(unsigned(timing_int_part)) = time_search_step+1) then
-    --                     if(gold_sel = '0') then
-    --                         gold_a_sync <= '0';
-    --                         gold_b_sync <= '1';
-    --                     else
-    --                         gold_a_sync <= '1';
-    --                         gold_b_sync <= '0';
-    --                     end if;
-                        
-    --                 else
-    --                     gold_a_sync <= '0';
-    --                     gold_b_sync <= '0';
-    --                 end if;
-    --             else
-    --                 gold_a_sync <= '0';
-    --                 gold_b_sync <= '0';
-    --             end if;
-    --         when others=>
-    --             gold_a_sync <= '0';
-    --             gold_b_sync <= '0';
-    --     end case;
-    -- end process;
+    process(trk_state, timing_period_strobe, master_timing_slv, time_match) is
+    begin
+        case trk_state is
+            when PREROLLING | TRACKING=>
+                if(time_match = master_timing_slv) then
+                    gold_sync <= '1';
+                else
+                    gold_sync <= '0';
+                end if;
+            when others=>
+                gold_sync <= '0';
+        end case;
+    end process;
+    
+
 
     process(trk_state) is
     begin
@@ -204,6 +203,17 @@ begin
     process(trk_state) is
     begin
         case trk_state is
+            when PREROLLING | TRACKING=>
+                accu_sr_ena <= '1';
+            when others=>
+                accu_sr_ena <= '0';
+        end case;
+    end process;
+    
+
+    process(trk_state) is
+    begin
+        case trk_state is
             when TRACKING=>
                 nco_ena <= '1';
             when others=>
@@ -214,7 +224,7 @@ begin
     process(trk_state,timing_period_strobe) is
     begin
         case trk_state is
-            when TRACKING | TRIGGERED_WAIT_SOF=>
+            when TRACKING | PREROLLING=>
                 accu_sync <= timing_period_strobe;
             when others=>
                 accu_sync <= '0';
@@ -225,15 +235,20 @@ begin
     begin
         if reset = '1' then
             trk_state <= WAITING;
+            time_match_frac <= (others => '0');
             ph_inc_load <= '0';
         elsif(rising_edge(clk)) then
             ph_inc_load <= '0';
             case trk_state is
                 when WAITING =>
-                    if( trk_en = '1') then
+                    if(trk_en = '1' and trk_update = '1') then
                         trk_state <= PREPARING;
-                                                --ph_inc_reg <= phase_inc_step;
-                        ph_inc_load <= '1';
+                        --this should set when the (symbol) gold code is updated
+                        if(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0))) = 0) then
+                            time_match_frac <= std_logic_vector(to_unsigned(OVERSAMPLE_RATIO-1, MASTER_COUNT_WIDTH_FRAC));
+                        else
+                            time_match_frac <= std_logic_vector(to_unsigned(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0)))-1, MASTER_COUNT_WIDTH_FRAC));
+                        end if;
                     end if;
                 when PREPARING=>
                     trk_state <= TRIGGERED_WAIT_SOF;
@@ -246,7 +261,18 @@ begin
                         trk_state <= TRACKING;
                     end if;
                 when TRACKING =>
-                    
+                    if(trk_update = '1') then
+                        if(trk_en = '0') then
+                            trk_state <= WAITING;
+                        else
+                            trk_state <= PREPARING;
+                            if(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0))) = 0) then
+                                time_match_frac <= std_logic_vector(to_unsigned(OVERSAMPLE_RATIO-1, MASTER_COUNT_WIDTH_FRAC));
+                            else
+                                time_match_frac <= std_logic_vector(to_unsigned(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0)))-1, MASTER_COUNT_WIDTH_FRAC));
+                            end if;
+                        end if;                      
+                    end if;
                 when others=>
                     trk_state <= WAITING;
             end case;

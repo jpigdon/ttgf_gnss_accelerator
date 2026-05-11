@@ -10,6 +10,22 @@ import gen_synthetic_data
 import ca_code_gen
 
 SPI_PERIOD_NS = 1000
+#TRACKING_THRESHOLD = 5000
+TRACKING_THRESHOLD = 100000
+
+NUM_TRACK_CHANNELS = 3
+TRACKING_CONTROL_ADDR = 9
+TRACKING_BASE_ADDR = 10
+TRACKING_CHAN_STRIDE = 6
+TRACKING_CONFIG_STRIDE = 4
+
+num_svs = 0
+sv_array = np.zeros(num_svs)
+target_snr_db_array = np.zeros(num_svs)
+code_phase_error_array = np.zeros(num_svs)
+freq_error_hz_array = np.zeros(num_svs)
+num_tracking = 0
+tracking_pow = np.zeros(NUM_TRACK_CHANNELS)
 
 ASSERT = True
 if "NOASSERT" in os.environ:
@@ -22,10 +38,13 @@ async def reset(dut):
     dut.rst_n.value = 1;
 
 
-async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81A50F00, num_read_ops=4, read_op_delays=[5000,5000,5000,5000], read_op_words=[0x05000000, 0x06000000, 0x07000000, 0x08000000] ):
+async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81A50F00, num_read_ops=5, read_op_delays=[5000,5000,5000,5000,5000], read_op_words=[0x00000000, 0x05000000, 0x06000000, 0x07000000, 0x08000000], tracking_assignment_delay = 5000):
+    global num_svs
+    global num_tracking
+    
     uin_val = 0x03
     dut.uio_in.value = uin_val
-
+    #starting transactions, initialise and setup system
     for j in range(num_transactions):
         await Timer(delay_ns[j], unit='ns')
         uin_val = 0x02
@@ -59,20 +78,22 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
         await Timer(1.5*SPI_PERIOD_NS, unit='ns')
         uin_val = uin_val | 0x01
         dut.uio_in.value = uin_val
-    
+    #running transactions
+    pow_result_array = np.zeros(1023)
     while True:
         await dut.uo_out.value_change
         #await Edge(dut.uo_out)
+        
         readback_idx = 0
         readback_ph_step = 0
         readback_ival = 0
         readback_qval = 0
         readback_magsq = 0
+
         for j in range(num_read_ops):
             read_op_val = 0x00000000
             await Timer(read_op_delays[j], unit='ns')
             uin_val = 0x02
-
             if(((read_op_words[j] >> 31) & 1) == 1):
                 uin_val = uin_val | (1 << 1)
             else:
@@ -102,6 +123,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
             await Timer(1.5*SPI_PERIOD_NS, unit='ns')
             uin_val = uin_val | 0x01
             dut.uio_in.value = uin_val
+
             if(read_op_words[j] == 0x05000000):
                 readback_ival = int.from_bytes(((read_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
             elif(read_op_words[j] == 0x06000000):
@@ -110,13 +132,180 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                 readback_ph_step = read_op_val
             else:
                 readback_magsq = readback_ival*readback_ival + readback_qval*readback_qval
-                readback_idx = read_op_val & 0x000003FF
-                print(f"Max for idx {readback_idx} was {readback_magsq}")
-                
+                readback_idx = int(read_op_val & 0x000003FF)
+                pow_result_array[readback_idx] = readback_magsq
+                if(readback_magsq >= TRACKING_THRESHOLD):
+                    #setup tracking channel here
+                    if(num_tracking < NUM_TRACK_CHANNELS):
+                        tracking_pow[num_tracking] = readback_magsq
+                        tracking_channel_idx = num_tracking
+                        num_tracking = num_tracking+1
+                        print(f"New tracking assignment time {readback_idx} power {readback_magsq} now tracking {num_tracking}")
+                    else:
+                        min_idx = np.argmin(tracking_pow)
+                        tracking_channel_idx = min_idx
+                        print(f"Retuning tracker {min_idx} for time {readback_idx} power {readback_magsq}")
+                        tracking_pow[min_idx] = readback_magsq
+                    #do tracking setup transactions here
+                    tracking_addr = TRACKING_BASE_ADDR + tracking_channel_idx*TRACKING_CHAN_STRIDE
+                    tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
+                    #8 for the integer part, tracking can be done in subsample accuracy, shif by 2 more to handle that
+                    tracking_transaction = tracking_transaction | readback_idx << (8+2)
+                    print(f"Time write operation {hex(tracking_transaction)}")
+                    
+                    await Timer(tracking_assignment_delay, unit='ns')
+                    uin_val = 0x02
+                    if(((tracking_transaction >> 31) & 1) == 1):
+                        uin_val = uin_val | (1 << 1)
+                    else:
+                        uin_val = uin_val & 0xFD
 
-            
+                    dut.uio_in.value = uin_val
 
-            
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    for i in range(31):
+                    #     #set the bit
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val | (1 << 3)
+                        dut.uio_in.value = uin_val
+                        #clock goes high
+
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val & 0xF7 #clock goes low
+
+                        if(((tracking_transaction >> 31-i-1) & 1) == 1):
+                            uin_val = uin_val | (1 << 1)
+                        else:
+                            uin_val = uin_val & 0xFD
+
+                        dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    uin_val = uin_val | 0x01
+                    dut.uio_in.value = uin_val
+
+                    tracking_addr = TRACKING_BASE_ADDR + (tracking_channel_idx*TRACKING_CHAN_STRIDE) + 1
+                    tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
+                    tracking_transaction = tracking_transaction | ((readback_ph_step << 8) & 0x00FFFF00)
+
+                    print(f"Freq write operation {hex(tracking_transaction)}")
+
+                    await Timer(tracking_assignment_delay, unit='ns')
+                    uin_val = 0x02
+                    if(((tracking_transaction >> 31) & 1) == 1):
+                        uin_val = uin_val | (1 << 1)
+                    else:
+                        uin_val = uin_val & 0xFD
+
+                    dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    for i in range(31):
+                    #     #set the bit
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val | (1 << 3)
+                        dut.uio_in.value = uin_val
+                        #clock goes high
+
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val & 0xF7 #clock goes low
+
+                        if(((tracking_transaction >> 31-i-1) & 1) == 1):
+                            uin_val = uin_val | (1 << 1)
+                        else:
+                            uin_val = uin_val & 0xFD
+
+                        dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    uin_val = uin_val | 0x01
+                    dut.uio_in.value = uin_val
+
+                    tracking_addr = TRACKING_BASE_ADDR + (tracking_channel_idx*TRACKING_CHAN_STRIDE) + 2
+                    tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
+                    tracking_transaction = tracking_transaction | (word_to_send[0] & 0x00FFFF00)
+
+                    print(f"SV write operation {hex(tracking_transaction)}")
+
+                    await Timer(tracking_assignment_delay, unit='ns')
+                    uin_val = 0x02
+                    if(((tracking_transaction >> 31) & 1) == 1):
+                        uin_val = uin_val | (1 << 1)
+                    else:
+                        uin_val = uin_val & 0xFD
+
+                    dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    for i in range(31):
+                    #     #set the bit
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val | (1 << 3)
+                        dut.uio_in.value = uin_val
+                        #clock goes high
+
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val & 0xF7 #clock goes low
+
+                        if(((tracking_transaction >> 31-i-1) & 1) == 1):
+                            uin_val = uin_val | (1 << 1)
+                        else:
+                            uin_val = uin_val & 0xFD
+
+                        dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    uin_val = uin_val | 0x01
+                    dut.uio_in.value = uin_val
+
+                    tracking_addr = TRACKING_CONTROL_ADDR
+                    tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
+                    #enable and update this channel
+                    tracking_transaction = tracking_transaction | (0x3 << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
+
+                    print(f"Tracking Control Update operation {hex(tracking_transaction)}")
+
+                    await Timer(tracking_assignment_delay, unit='ns')
+                    uin_val = 0x02
+                    if(((tracking_transaction >> 31) & 1) == 1):
+                        uin_val = uin_val | (1 << 1)
+                    else:
+                        uin_val = uin_val & 0xFD
+
+                    dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    for i in range(31):
+                    #     #set the bit
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val | (1 << 3)
+                        dut.uio_in.value = uin_val
+                        #clock goes high
+
+                        await Timer(SPI_PERIOD_NS/2, unit='ns')
+                        uin_val = uin_val & 0xF7 #clock goes low
+
+                        if(((tracking_transaction >> 31-i-1) & 1) == 1):
+                            uin_val = uin_val | (1 << 1)
+                        else:
+                            uin_val = uin_val & 0xFD
+
+                        dut.uio_in.value = uin_val
+
+                    await Timer(1.5*SPI_PERIOD_NS, unit='ns')
+                    uin_val = uin_val | 0x01
+                    dut.uio_in.value = uin_val
+
+
+
+                if(readback_idx == 1022):
+                    top_five_locations = np.argpartition(pow_result_array, -5)[-5:]
+                    top_five_values = pow_result_array[top_five_locations]
+                    print(f"At end of acq pass, top 5 maxes are at: {top_five_locations} values {top_five_values}")
+
+                    #clear it ready for next iteration
+                    pow_result_array = np.zeros(1023)
+
         
         await Timer(read_op_delays[0], unit='ns')
         uin_val = 0x02
@@ -157,8 +346,8 @@ async def test_um_system(dut):
     
 
     # test a range of values
+    (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data()
 
-    test_data_unquantised = gen_synthetic_data.generate_synthetic_data()
     i_chan_quantised = np.array(np.where(np.real(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
     q_chan_quantised = np.array(np.where(np.imag(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
 
@@ -166,7 +355,7 @@ async def test_um_system(dut):
     #print(hex(taps))
 
     delays = [5000, 5000, 5000, 5000, 5000]
-    transactions = [ 0x81000000 | (taps << 8), 0x82FFFE00, 0x83000100, 0x84000300, 0x80000200]
+    transactions = [ 0x81000000 | (taps << 8), 0x82000000, 0x83000000, 0x84000100, 0x80000200]
 
     clock = Clock(dut.clk, int(((1/4.092)*1000000)/2)*2, unit="ps") #force divisible by two
     cocotb.start_soon(clock.start())

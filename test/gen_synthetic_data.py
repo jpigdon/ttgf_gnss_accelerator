@@ -17,7 +17,7 @@ def generate_synthetic_data():
     #sv_search_range = [1, ca_code_gen.num_sv()]
 
     num_svs_range = [1, 1]
-    snr_range_db = [0, 0]
+    snr_range_db = [20, 20]
     code_phase_error_range = [0, 1023];
     freq_error_range_hz = [0, 0];
     sv_search_range = [1, 1]
@@ -33,11 +33,13 @@ def generate_synthetic_data():
         if(i == 0):
             new_sv = random.randint(1, sv_search_range[1])
         else:
+            #simulation allow multiple to speed up simulation (just test sv 1)
             #should only have one of each sv, make sure we don't have duplicates
-            while True:
+            #while True:
                 new_sv = random.randint(1, sv_search_range[1])    
-                if(np.size(np.where(sv_array == new_sv)) == 0):
-                    break
+                #check to see if it's unique
+            #    if(np.size(np.where(sv_array == new_sv)) == 0):
+            #        break
         sv_array[i] = new_sv
         target_snr_db_array[i] = random.randint(snr_range_db[1], snr_range_db[0])
         target_snr_lin_array[i] = 10.0**(target_snr_db_array[i]/10)
@@ -136,4 +138,4 @@ def generate_synthetic_data():
     total_signal_power = np.mean(np.abs(combined_noisy_signal)**2)
     print(f"Total Signal Power: {total_signal_power}")
 
-    return combined_noisy_signal
+    return (combined_noisy_signal, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array)
