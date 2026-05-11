@@ -278,16 +278,16 @@ begin
 
     reference_gold_code_e <= sr_delay_reg(SR_DELAY_MAX*2); --newest gold code element always msb
 
-    reference_gold_code_m <= sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_0) when accu_sr_sel = "00" else
-                                sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_1) when accu_sr_sel = "01" else
-                                sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_2) when accu_sr_sel = "10" else
-                                sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_3);
+    reference_gold_code_m <= sr_delay_reg((SR_DELAY_MAX*2)-SR_INPUT_MAP_0) when accu_sr_sel = "00" else
+                                sr_delay_reg((SR_DELAY_MAX*2)-SR_INPUT_MAP_1) when accu_sr_sel = "01" else
+                                sr_delay_reg((SR_DELAY_MAX*2)-SR_INPUT_MAP_2) when accu_sr_sel = "10" else
+                                sr_delay_reg((SR_DELAY_MAX*2)-SR_INPUT_MAP_3);
 
 
-    reference_gold_code_l <= sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_0) when accu_sr_sel = "00" else
-                                sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_1*2) when accu_sr_sel = "01" else
-                                sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_2*2) when accu_sr_sel = "10" else
-                                sr_delay_reg(SR_DELAY_MAX*2-SR_INPUT_MAP_3*2);
+    reference_gold_code_l <= sr_delay_reg((SR_DELAY_MAX*2)-(SR_INPUT_MAP_0*2)) when accu_sr_sel = "00" else
+                                sr_delay_reg((SR_DELAY_MAX*2)-(SR_INPUT_MAP_1*2)) when accu_sr_sel = "01" else
+                                sr_delay_reg((SR_DELAY_MAX*2)-(SR_INPUT_MAP_2*2)) when accu_sr_sel = "10" else
+                                sr_delay_reg((SR_DELAY_MAX*2)-(SR_INPUT_MAP_3*2));
 
     process(clk) is
     begin
