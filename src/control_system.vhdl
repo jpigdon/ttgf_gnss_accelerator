@@ -173,8 +173,8 @@ begin
     track_sv <= track_sv_reg;
 
     track_cfg : for i in 0 to NUM_TRACK_CHANNELS-1 generate
-       track_channel_en(i) <= trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i));
-       track_len_slv((TRACK_LEN_WIDTH*(i+1))-1 downto i*TRACK_LEN_WIDTH) <=  trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-TRACK_LEN_WIDTH);
+      track_channel_en(i) <= trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*i));
+      track_len_slv((TRACK_LEN_WIDTH*(i+1))-1 downto i*TRACK_LEN_WIDTH) <=  trk_channel_config_reg(((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-1 downto ((TRACK_CONFIG_REG_CH_STRIDE-1)*(i+1))-TRACK_LEN_WIDTH);
     end generate track_cfg;
     time_interrupt <= interrupt_flag_int;
 
@@ -205,6 +205,13 @@ begin
                         "0000" & track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_MID_OFFSET else
                         "0000" & track_i_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_I_LATE_OFFSET else
                         "0000" & track_q_accu_val((2+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (2+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_Q_LATE_OFFSET else
+
+                        -- "0000" & track_i_accu_val((3+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (3+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_I_EARLY_OFFSET else
+                        -- "0000" & track_q_accu_val((3+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (3+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_Q_EARLY_OFFSET else
+                        -- "0000" & track_i_accu_val((3+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (3+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_I_MID_OFFSET else
+                        -- "0000" & track_q_accu_val((3+1)*3*ACCU_OUTPUT_WIDTH-1*ACCU_OUTPUT_WIDTH-1 downto (3+1)*3*ACCU_OUTPUT_WIDTH-(1+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_Q_MID_OFFSET else
+                        -- "0000" & track_i_accu_val((3+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (3+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_I_LATE_OFFSET else
+                        -- "0000" & track_q_accu_val((3+1)*3*ACCU_OUTPUT_WIDTH-2*ACCU_OUTPUT_WIDTH-1 downto (3+1)*3*ACCU_OUTPUT_WIDTH-(2+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_Q_LATE_OFFSET else
                         
                         -- "0000" & track_i_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_I_EARLY_OFFSET else
                         -- "0000" & track_q_accu_val((0+1)*3*ACCU_OUTPUT_WIDTH-0*ACCU_OUTPUT_WIDTH-1 downto (0+1)*3*ACCU_OUTPUT_WIDTH-(0+1)*ACCU_OUTPUT_WIDTH) when to_integer(signed(spi_op_addr_reg)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_Q_EARLY_OFFSET else
@@ -279,18 +286,24 @@ begin
                     track_time_reg(((1+1)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))-1 downto ((1)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))) <= spi_write_op_data((MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_TIME_OFFSET) then
                     track_time_reg(((2+1)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))-1 downto ((2)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))) <= spi_write_op_data((MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC)-1 downto 0);
+                -- elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_TIME_OFFSET) then
+                --     track_time_reg(((3+1)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))-1 downto ((3)*(MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC))) <= spi_write_op_data((MASTER_COUNT_WIDTH_INT+MASTER_COUNT_WIDTH_FRAC)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_PHASE_OFFSET) then
                     track_phase_inc_reg(((0+1)*(PHASE_INC_WIDTH))-1 downto ((0)*(PHASE_INC_WIDTH))) <= spi_write_op_data((PHASE_INC_WIDTH)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_PHASE_OFFSET) then
                     track_phase_inc_reg(((1+1)*(PHASE_INC_WIDTH))-1 downto ((1)*(PHASE_INC_WIDTH))) <= spi_write_op_data((PHASE_INC_WIDTH)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_PHASE_OFFSET) then
                     track_phase_inc_reg(((2+1)*(PHASE_INC_WIDTH))-1 downto ((2)*(PHASE_INC_WIDTH))) <= spi_write_op_data((PHASE_INC_WIDTH)-1 downto 0);
+                -- elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_PHASE_OFFSET) then
+                --     track_phase_inc_reg(((3+1)*(PHASE_INC_WIDTH))-1 downto ((3)*(PHASE_INC_WIDTH))) <= spi_write_op_data((PHASE_INC_WIDTH)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*0)+TRK_SV_OFFSET) then
                     track_sv_reg(((0+1)*(GPS_GOLD_TAPS_WIDTH))-1 downto ((0)*(GPS_GOLD_TAPS_WIDTH))) <= spi_write_op_data((GPS_GOLD_TAPS_WIDTH)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*1)+TRK_SV_OFFSET) then
                     track_sv_reg(((1+1)*(GPS_GOLD_TAPS_WIDTH))-1 downto ((1)*(GPS_GOLD_TAPS_WIDTH))) <= spi_write_op_data((GPS_GOLD_TAPS_WIDTH)-1 downto 0);
                 elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*2)+TRK_SV_OFFSET) then
                     track_sv_reg(((2+1)*(GPS_GOLD_TAPS_WIDTH))-1 downto ((2)*(GPS_GOLD_TAPS_WIDTH))) <= spi_write_op_data((GPS_GOLD_TAPS_WIDTH)-1 downto 0);
+                -- elsif(to_integer(signed(spi_op_addr)) = TRK_BASE_ADDR+(TRK_CH_INC*3)+TRK_SV_OFFSET) then
+                --     track_sv_reg(((3+1)*(GPS_GOLD_TAPS_WIDTH))-1 downto ((3)*(GPS_GOLD_TAPS_WIDTH))) <= spi_write_op_data((GPS_GOLD_TAPS_WIDTH)-1 downto 0);
                 end if;
             elsif(spi_read_op_req = '1') then --address will select the data to be passed back, just needs to stay stable
                 spi_op_addr_reg <= spi_op_addr;

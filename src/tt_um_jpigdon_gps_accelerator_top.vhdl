@@ -19,6 +19,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
     constant OUTPUT_DATA_WIDTH : integer := 16;
     constant INPUT_DATA_WIDTH : integer := 16;
     constant ADDR_WIDTH : integer := 5;
+    --constant ADDR_WIDTH : integer := 6;
     constant OVERSAMPLE_RATIO : integer := 4;
     constant TRACK_LEN_WIDTH : integer := 2;
     constant ACCU_WIDTH : integer := 14;
@@ -30,6 +31,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
     constant PHASE_COUNT_WIDTH : integer := 8;
     constant PHASE_INC_WIDTH : integer := 8;
     constant NUM_TRACK_CHANNELS : integer := 3;
+    --constant NUM_TRACK_CHANNELS : integer := 4;
 
     component control_system is
     generic(
