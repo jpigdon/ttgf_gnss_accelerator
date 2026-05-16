@@ -76,8 +76,8 @@ puts [ get_clocks sample_clk ]
 puts [ get_clocks spi_clk ]
 puts [ all_clocks ]
 puts [ all_inputs ]
-puts [ all_sample_inputs_8 ]
-puts [ all_spi_inputs_10 ]
+puts [ $all_sample_inputs_8 ]
+puts [ $all_spi_inputs_10 ]
 
 
 
