@@ -58,8 +58,8 @@ set all_sample_outputs  [lreplace [ all_outputs ] $idx $idx]
 set idx [lsearch [ all_outputs] "uo_out"]
 set all_spi_outputs  [lreplace [ all_outputs ] $idx $idx]
 
-set_input_delay $input_delay_value -clock [get_clocks sample_clk] $all_sample_inputs_8
-set_input_delay $input_delay_value -clock [get_clocks spi_clk] $all_spi_inputs_10
+set_input_delay $input_delay_value -clock [get_clocks sample_clk] [get_ports $all_sample_inputs_8]
+set_input_delay $input_delay_value -clock [get_clocks spi_clk] [get_ports $all_spi_inputs_10]
 
 set_output_delay $output_delay_value -clock [get_clocks sample_clk] $all_sample_outputs
 set_output_delay $output_delay_value -clock [get_clocks spi_clk] $all_spi_outputs
