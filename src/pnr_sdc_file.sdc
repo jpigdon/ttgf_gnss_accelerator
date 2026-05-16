@@ -67,7 +67,7 @@ set_clock_transition $::env(SYNTH_CLOCK_TRANSITION) [get_clocks spi_clk]
 
 set_clock_groups -asynchronous -group {sample_clk} -group {spi_clk}
 
-set_driving_cell -lib_cell $::env(SYNTH_DRIVING_CELL) -pin $::env(SYNTH_DRIVING_CELL_PIN) $all_inputs_wo_clk
+set_driving_cell -lib_cell $::env(SYNTH_DRIVING_CELL) -pin $::env(SYNTH_DRIVING_CELL_PIN) $all_sample_inputs_8
 set_load  $cap_load [ all_outputs ]
 set_timing_derate -early [ expr {1-$::env(SYNTH_TIMING_DERATE)} ]
 set_timing_derate -late [ expr {1+$::env(SYNTH_TIMING_DERATE)} ]
