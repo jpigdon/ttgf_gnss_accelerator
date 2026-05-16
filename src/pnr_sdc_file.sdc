@@ -7,9 +7,9 @@ set_max_fanout $::env(MAX_FANOUT_CONSTRAINT) [current_design]
 
 set cap_load [ expr $::env(OUTPUT_CAP_LOAD) / 1000.0]
 
-set idx [ lsearch [ all_inputs ] [get_ports “clk”] ]
+set idx [ lsearch [ all_inputs ] “clk” ]
 set all_inputs_wo_clk [ lreplace [ all_inputs ] $idx $idx ]
-set idx [ lsearch $all_inputs_wo_clk [get_ports “uio_in\[3\]”] ]
+set idx [ lsearch $all_inputs_wo_clk “uio_in\[3\]” ]
 set all_inputs_wo_clk [ lreplace $all_inputs_wo_clk $idx $idx ]
 
 set idx [lsearch [ all_inputs] [get_ports "clk"]]
@@ -77,12 +77,12 @@ set_load  $cap_load [ all_outputs ]
 set_timing_derate -early [ expr {1-$::env(SYNTH_TIMING_DERATE)} ]
 set_timing_derate -late [ expr {1+$::env(SYNTH_TIMING_DERATE)} ]
 
-puts [ get_clocks sample_clk ]
-puts [ get_clocks spi_clk ]
-puts [ all_clocks ]
-puts [ all_inputs ]
-puts [ get_ports $all_sample_inputs_8 ]
-puts [ get_ports $all_spi_inputs_10 ]
+#puts [ get_clocks sample_clk ]
+#puts [ get_clocks spi_clk ]
+#puts [ all_clocks ]
+#puts [ all_inputs ]
+#puts [ get_ports $all_sample_inputs_8 ]
+#puts [ get_ports $all_spi_inputs_10 ]
 
 
 
