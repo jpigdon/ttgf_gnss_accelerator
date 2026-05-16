@@ -53,21 +53,26 @@ set all_sample_outputs  [lreplace [ all_outputs ] $idx $idx]
 set idx [lsearch [ all_outputs] "uo_out"]
 set all_spi_outputs  [lreplace [ all_outputs ] $idx $idx]
 
-#set_input_delay $input_delay_value -clock [get_clocks sample_clk] $all_sample_inputs_8
-#set_input_delay $input_delay_value -clock [get_clocks spi_clk] $all_spi_inputs
+set_input_delay $input_delay_value -clock [get_clocks sample_clk] $all_sample_inputs_8
+set_input_delay $input_delay_value -clock [get_clocks spi_clk] $all_spi_inputs
 
 set_output_delay $output_delay_value -clock [get_clocks sample_clk] $all_sample_outputs
 set_output_delay $output_delay_value -clock [get_clocks spi_clk] $all_spi_outputs
 
-#set_clock_uncertainty $env::(SYNTH_CLOCK_UNCERTAINTY) [get_clocks sample_clk]
-#set_clock_uncertainty $env::(SYNTH_CLOCK_UNCERTAINTY) [get_clocks spi_clk]
+set_clock_uncertainty $::env(SYNTH_CLOCK_UNCERTAINTY) [get_clocks sample_clk]
+set_clock_uncertainty $::env(SYNTH_CLOCK_UNCERTAINTY) [get_clocks spi_clk]
 
-#set_clock_transition $env::(SYNTH_CLOCK_TRANSITION) [get_clocks sample_clk]
-#set_clock_transition $env::(SYNTH_CLOCK_TRANSITION) [get_clocks spi_clk]
+set_clock_transition $::env(SYNTH_CLOCK_TRANSITION) [get_clocks sample_clk]
+set_clock_transition $::env(SYNTH_CLOCK_TRANSITION) [get_clocks spi_clk]
 
 set_clock_groups -asynchronous -group {sample_clk} -group {spi_clk}
 
-
+puts [ get_clocks sample_clk ]
+puts [ get_clocks spi_clk ]
+puts [ all_clocks ]
+puts [ all_inputs ]
+puts [ all_sample_inputs_8 ]
+puts [ all_spi_inputs ]
 
 
 
