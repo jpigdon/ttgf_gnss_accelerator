@@ -282,7 +282,7 @@ begin
 
                         if(time_search_step = (2**GPS_GOLD_TAPS_WIDTH)-2) then
                             time_search_step <= 0;
-                            if(freq_search_step = freq_search_max) then
+                            if(freq_search_step = freq_search_max-1) then
                                 --end of freq_search
                                 freq_search_step <= 0;
                                 acq_state <= WAITING;

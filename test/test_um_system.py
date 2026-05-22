@@ -10,8 +10,8 @@ import gen_synthetic_data
 import ca_code_gen
 
 SPI_PERIOD_NS = 1000
-#TRACKING_THRESHOLD = 5000
-TRACKING_THRESHOLD = 100000
+TRACKING_THRESHOLD = 5000
+#TRACKING_THRESHOLD = 100000
 
 TRACKING_LOOP_PERIOD = 10
 NUM_TRACK_CHANNELS = 3
@@ -28,10 +28,15 @@ freq_error_hz_array = np.zeros(num_svs)
 num_tracking = 0
 tracking_time = np.zeros(NUM_TRACK_CHANNELS)
 tracking_pow = np.zeros(NUM_TRACK_CHANNELS)
+tracking_ph_inc = np.zeros(NUM_TRACK_CHANNELS)
 
 ASSERT = True
 if "NOASSERT" in os.environ:
     ASSERT = False
+
+GATE = False
+if "GATES" in os.environ:
+    GATE = True
 
 async def reset(dut):
     dut.rst_n.value = 0
@@ -154,7 +159,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                         tracking_channel_idx = min_idx
                         print(f"Retuning tracker {min_idx} for time {readback_idx} power {readback_magsq}")
                         tracking_pow[min_idx] = readback_magsq
-                        tracking_time[num_tracking] = readback_idx << 2
+                        tracking_time[min_idx] = readback_idx << 2
 
                     #do tracking setup transactions here
                     tracking_addr = TRACKING_BASE_ADDR + tracking_channel_idx*TRACKING_CHAN_STRIDE
@@ -221,9 +226,25 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 @cocotb.test()
 async def test_um_system(dut):
     
+    if GATE:
+        num_svs_range = [1, 1]
+        snr_range_db = [-10, -20]
+        code_phase_error_range = [0, 1023];
+        freq_error_range_hz = [0, 0];
+        sv_search_range = [1, 1]
+        test_samples = 1023*4*1028
+    else:
+        num_svs_range = [1, 1]
+        snr_range_db = [-10, -20]
+        code_phase_error_range = [0, 1023];
+        freq_error_range_hz = [-1000, 1000];
+        sv_search_range = [1, 1]
+        test_samples = 1023*4*5*1028
+
+
 
     # test a range of values
-    (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data()
+    (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data(num_svs_range=num_svs_range, snr_range_db=snr_range_db, code_phase_error_range=code_phase_error_range, freq_error_range_hz=freq_error_range_hz, sv_search_range=sv_search_range)
 
     i_chan_quantised = np.array(np.where(np.real(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
     q_chan_quantised = np.array(np.where(np.imag(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
@@ -232,7 +253,7 @@ async def test_um_system(dut):
     #print(hex(taps))
 
     delays = [5000, 5000, 5000, 5000, 5000]
-    transactions = [ 0x81000000 | (taps << 8), 0x82000000, 0x83000000, 0x84000100, 0x80000200]
+    transactions = [ 0x81000000 | (taps << 8), 0x8200F600, 0x83000500, 0x84000500, 0x80000200]
 
     clock = Clock(dut.clk, int(((1/4.092)*1000000)/2)*2, unit="ps") #force divisible by two
     cocotb.start_soon(clock.start())
@@ -250,7 +271,7 @@ async def test_um_system(dut):
     await reset(dut)
     await RisingEdge(dut.clk)
         
-    for test_count in range(1023*4*1028):
+    for test_count in range(test_samples):
 
         await RisingEdge(dut.clk)
         uin_val = 0x00

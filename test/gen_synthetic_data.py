@@ -2,9 +2,9 @@ import numpy as np
 import random
 import ca_code_gen
 
-def generate_synthetic_data():
+def generate_synthetic_data(num_svs_range = [1, 1], snr_range_db = [-10, -20], code_phase_error_range = [0, 1023], freq_error_range_hz = [0, 0], sv_search_range = [1, 1]):
     oversample_ratio = 4.0
-    num_symbols = 4100
+    num_symbols = 4*4100
     phase_flip = 20 #BPSK every 20
     chip_rate = 1.023e6
 
@@ -16,11 +16,11 @@ def generate_synthetic_data():
     #freq_error_range_hz = [-5000, 5000];
     #sv_search_range = [1, ca_code_gen.num_sv()]
 
-    num_svs_range = [1, 1]
-    snr_range_db = [20, 20]
-    code_phase_error_range = [0, 1023];
-    freq_error_range_hz = [0, 0];
-    sv_search_range = [1, 1]
+    #num_svs_range = [1, 1]
+    #snr_range_db = [-10, -20]
+    #code_phase_error_range = [0, 1023];
+    #freq_error_range_hz = [0, 0];
+    #sv_search_range = [1, 1]
 
     num_svs = random.randint(num_svs_range[0], num_svs_range[1])
     print(f"Number sats for test: {num_svs}")
