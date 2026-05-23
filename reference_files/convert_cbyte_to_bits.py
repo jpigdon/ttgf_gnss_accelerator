@@ -25,7 +25,7 @@ def convert_sigmf_file(filename):
     offset_idx = 0
     percent_counter = 0
     one_percent_count = int(num_bytes/100)
-    for i in range(num_bytes): #was numbytes
+    for i in range(10): #was numbytes
         if(percent_counter > one_percent_count):
             percent_counter = 0
             print(f"Completed {i} of {num_bytes}: {int((i/num_bytes)*100)}%")
@@ -35,7 +35,7 @@ def convert_sigmf_file(filename):
         di_byte_val = 0x00
         for j in range(4): #num of complex pairs per byte 
             complex_val = handle[offset_idx:offset_idx+1]
-            #print(f"For index {offset_idx} val {complex_val}")
+            print(f"For index {offset_idx} val {complex_val}")
             if(np.real(complex_val) < 0): #bit as per https://gnss-sdr.org/docs/sp-blocks/signal-source/
                 byte_val = byte_val | 0x01
                 di_byte_val = di_byte_val | 0x03
@@ -45,10 +45,8 @@ def convert_sigmf_file(filename):
                 byte_val = byte_val | 0x01
                 di_byte_val = di_byte_val | 0x03
             if(j == 3):
-                if i<10:
-                    print(f"For index {offset_idx} val {complex_val}")
-                    print(f"Byte packing complete byte: {hex(byte_val)} dibit first: {hex(packed_dibit[i*2])} dibit second: {hex(di_byte_val)}")
                 packed_bit[i] = byte_val
+                print(hex(byte_val))
                 packed_dibit[(i*2)+1] = di_byte_val
             else:
                 byte_val = byte_val << 1
@@ -58,14 +56,26 @@ def convert_sigmf_file(filename):
                 else:
                     di_byte_val = di_byte_val << 2
             offset_idx = offset_idx+1
-    packed_bit.tofile(bit_filename)
-    packed_dibit.tofile(dibit_filename)
+    #packed_bit.tofile(bit_filename)
+    #packed_dibit.tofile(dibit_filename)
+    
+    bit_interleaved_array = np.packbits(np.array(handle[0:].view('float32')) < 0)
+    dibit_interleaved_array = np.packbits(np.repeat(np.array(handle[0:].view('float32')) < 0,2))
+    
+    bit_interleaved_array.tofile(bit_filename)
+    dibit_interleaved_array.tofile(dibit_filename)
+    
     check_bits_file = open(bit_filename, "rb")
-    print(f"First 10 bytes from bit packed file {hex(check_bits_file.read(10))}"))
+    bits_array = check_bits_file.read(10)
+    for i in range(10):
+        print(f"First {i} byte from bit packed file {hex(bits_array[i])}")
     check_bits_file.close()
     check_dibits_file = open(dibit_filename, "rb")
-    print(f"First 10 bytes from dibit packed file {hex(check_dibits_file.read(10))}"))
+    dibits_array = check_dibits_file.read(10)
+    for i in range(10):
+        print(f"First {i} bytes from dibit packed file {hex(dibits_array[i])}")
     check_dibits_file.close()
+    
     return 0
     
 if __name__ == "__main__":
