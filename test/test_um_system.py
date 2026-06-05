@@ -10,7 +10,6 @@ import gen_synthetic_data
 import ca_code_gen
 
 SPI_PERIOD_NS = 1000
-TRACKING_THRESHOLD = 5000
 #TRACKING_THRESHOLD = 100000
 
 TRACKING_LOOP_PERIOD = 10
@@ -37,6 +36,34 @@ if "NOASSERT" in os.environ:
 GATE = False
 if "GATES" in os.environ:
     GATE = True
+
+REAL = False
+if "REAL" in os.environ:
+    REAL = True
+    input_filename = os.environ['REAL'] 
+    if("REAL_SV" in os.environ):
+        real_sv = int(os.environ['REAL_SV'])
+    else:
+        real_sv = 1
+
+    if("REAL_FREQ_START" in os.environ):
+        real_freq_start = int(os.environ['REAL_FREQ_START'])
+        real_freq_stop = int(os.environ['REAL_FREQ_STOP'])
+    else:
+        real_freq_start = 0
+        real_freq_stop = 5000
+
+    if("REAL_FREQ_STEP" in os.environ):
+        real_freq_step = int(os.environ['REAL_FREQ_STEP'])
+    else:
+        real_freq_step = 200
+
+    if("REAL_TRACK_THRESH" in os.environ):
+        real_track_thresh = int(os.environ['REAL_TRACK_THRESH'])
+    else:
+        real_track_thresh  = 10000
+    TRACKING_THRESHOLD = real_track_thresh
+
 
 async def reset(dut):
     dut.rst_n.value = 0
@@ -225,35 +252,62 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
 
 @cocotb.test()
 async def test_um_system(dut):
-    
-    if GATE:
+    if REAL:
         num_svs_range = [1, 1]
         snr_range_db = [-10, -20]
         code_phase_error_range = [0, 1023];
-        freq_error_range_hz = [0, 0];
-        sv_search_range = [1, 1]
-        test_samples = 1023*4*1028
+        freq_search_range_hz = [real_freq_start, real_freq_stop];
+        sv_search_range = [real_sv, real_sv]
+        num_freq_search_steps = int(np.ceil((freq_search_range_hz[1] - freq_search_range_hz[0])/real_freq_step))
+        freq_search_step_array = np.linspace(freq_search_range_hz[0], freq_search_range_hz[1], num_freq_search_steps,endpoint=True)
+        print(f"Conducting freq search across {num_freq_search_steps} steps, seaching at {freq_search_step_array} threshold: {TRACKING_THRESHOLD}")
+
     else:
-        num_svs_range = [1, 1]
-        snr_range_db = [-10, -20]
-        code_phase_error_range = [0, 1023];
-        freq_error_range_hz = [-1000, 1000];
-        sv_search_range = [1, 1]
-        test_samples = 1023*4*5*1028
+        if GATE:
+            num_svs_range = [1, 1]
+            snr_range_db = [-10, -20]
+            code_phase_error_range = [0, 1023];
+            freq_error_range_hz = [0, 0];
+            sv_search_range = [1, 1]
+            test_samples = 1023*4*1028
+        else:
+            num_svs_range = [1, 1]
+            snr_range_db = [-10, -20]
+            code_phase_error_range = [0, 1023];
+            freq_error_range_hz = [-1000, 1000];
+            sv_search_range = [1, 1]
+            test_samples = 1023*4*5*1028
 
 
 
     # test a range of values
-    (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data(num_svs_range=num_svs_range, snr_range_db=snr_range_db, code_phase_error_range=code_phase_error_range, freq_error_range_hz=freq_error_range_hz, sv_search_range=sv_search_range)
-
-    i_chan_quantised = np.array(np.where(np.real(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
-    q_chan_quantised = np.array(np.where(np.imag(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
-
-    taps = ca_code_gen.taps_from_sv(1)
-    #print(hex(taps))
+    if REAL:
+        taps = ca_code_gen.taps_from_sv(sv_search_range[0])
+        unpacked_bits = np.unpackbits(np.fromfile(input_filename, dtype="uint8"))
+        i_chan_quantised = np.array((unpacked_bits[0::2]*-2)+1,dtype="int8")
+        q_chan_quantised = np.array((unpacked_bits[1::2]*-2)+1,dtype="int8")
+        test_samples = np.shape(i_chan_quantised)[0]
+        print(f"Real input file num samples: {test_samples}")
+        
+    else:
+        (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data(num_svs_range=num_svs_range, snr_range_db=snr_range_db, code_phase_error_range=code_phase_error_range, freq_error_range_hz=freq_error_range_hz, sv_search_range=sv_search_range)
+        i_chan_quantised = np.array(np.where(np.real(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
+        q_chan_quantised = np.array(np.where(np.imag(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
+        taps = ca_code_gen.taps_from_sv(sv_search_range[0])
 
     delays = [5000, 5000, 5000, 5000, 5000]
-    transactions = [ 0x81000000 | (taps << 8), 0x8200F600, 0x83000500, 0x84000500, 0x80000200]
+
+    if REAL:
+        #calculated start step and count phase increments from provided values
+        start_cmd_val = 0x82000000
+        inc_cmd_val = 0x83000000
+
+        count_cmd_val = 0x84000000 | ((num_freq_search_steps & 0xFF) << 8)
+        print(hex(count_cmd_val))
+        transactions = [ 0x81000000 | (taps << 8), start_cmd_val, inc_cmd_val, count_cmd_val, 0x80000200]
+    else:
+        #default transactions
+        transactions = [ 0x81000000 | (taps << 8), 0x8200F600, 0x83000500, 0x84000500, 0x80000200]
 
     clock = Clock(dut.clk, int(((1/4.092)*1000000)/2)*2, unit="ps") #force divisible by two
     cocotb.start_soon(clock.start())

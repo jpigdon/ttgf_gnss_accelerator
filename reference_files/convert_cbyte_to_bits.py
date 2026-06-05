@@ -9,9 +9,9 @@ def convert_sigmf_file(filename):
     dibit_filename = firstpart_filename+"_iq_dibitpacked.dat"
     print(f"Writing bit packed to {bit_filename}")
     print(f"Writing dibit packed to {dibit_filename}")
-    handle = sigmf.sigmffile.fromfile(filename)
+    handle = sigmf.sigmffile.fromfile(filename, autoscale=False)
     # reading data
-    handle.read_samples(autoscale=False)  # read all timeseries data
+    handle.read_samples()  # read all timeseries data
     num_samples = np.shape(handle)[0]
     print(f"Number of Samples: {num_samples}")
     num_bits = num_samples * 2 #one bits per sample, complex samples
