@@ -19,6 +19,13 @@ TRACKING_BASE_ADDR = 10
 TRACKING_CHAN_STRIDE = 6
 TRACKING_CONFIG_STRIDE = 4
 
+NCO_BIT_WIDTH = 16
+
+oversample_ratio = 4.0
+chip_rate = 1.023e6
+chip_period = 1/chip_rate
+sample_period = chip_period/oversample_ratio
+
 num_svs = 0
 sv_array = np.zeros(num_svs)
 target_snr_db_array = np.zeros(num_svs)
@@ -167,7 +174,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
             elif(read_op_words[j] == 0x06000000):
                 readback_qval = int.from_bytes(((read_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
             elif(read_op_words[j] == 0x07000000):
-                readback_ph_step = read_op_val
+                readback_ph_step = read_op_val & 0x0000FFFF
             else:
                 #it was the last one. check the results.
                 readback_magsq = readback_ival*readback_ival + readback_qval*readback_qval
@@ -222,7 +229,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                 if(readback_idx == 1022):
                     top_five_locations = np.argpartition(pow_result_array, -5)[-5:]
                     top_five_values = pow_result_array[top_five_locations]
-                    print(f"At end of acq pass, top 5 maxes are at: {top_five_locations} values {top_five_values}")
+                    print(f"At end of acq pass {readback_ph_step} freq: , top 5 maxes are at: {top_five_locations} values {top_five_values}")
 
                     #clear it ready for next iteration
                     pow_result_array = np.zeros(1023)
@@ -258,9 +265,13 @@ async def test_um_system(dut):
         code_phase_error_range = [0, 1023];
         freq_search_range_hz = [real_freq_start, real_freq_stop];
         sv_search_range = [real_sv, real_sv]
-        num_freq_search_steps = int(np.ceil((freq_search_range_hz[1] - freq_search_range_hz[0])/real_freq_step))
-        freq_search_step_array = np.linspace(freq_search_range_hz[0], freq_search_range_hz[1], num_freq_search_steps,endpoint=True)
-        print(f"Conducting freq search across {num_freq_search_steps} steps, seaching at {freq_search_step_array} threshold: {TRACKING_THRESHOLD}")
+        num_steps_per_cycle = 2**NCO_BIT_WIDTH
+        max_period = num_steps_per_cycle*sample_period
+        min_freq = 1/max_period
+        int_increment = int(np.floor(real_freq_step/min_freq))
+        quantized_search_steps = int(np.ceil((freq_search_range_hz[1] - freq_search_range_hz[0])/(min_freq*int_increment)))
+        quantized_search_step_array = np.arange(quantized_search_steps)*int_increment*min_freq
+        print(f"Conducting freq search across {quantized_search_steps} steps, seaching at {quantized_search_step_array} threshold: {TRACKING_THRESHOLD}")
 
     else:
         if GATE:
@@ -299,10 +310,10 @@ async def test_um_system(dut):
 
     if REAL:
         #calculated start step and count phase increments from provided values
-        start_cmd_val = 0x82000000
-        inc_cmd_val = 0x83000000
 
-        count_cmd_val = 0x84000000 | ((num_freq_search_steps & 0xFF) << 8)
+        start_cmd_val = 0x82000000
+        inc_cmd_val = 0x83000000 | ((int_increment & 0xFF) << 8)
+        count_cmd_val = 0x84000000 | ((quantized_search_steps & 0xFF) << 8)
         print(hex(count_cmd_val))
         transactions = [ 0x81000000 | (taps << 8), start_cmd_val, inc_cmd_val, count_cmd_val, 0x80000200]
     else:
