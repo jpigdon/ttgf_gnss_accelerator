@@ -269,9 +269,11 @@ async def test_um_system(dut):
         max_period = num_steps_per_cycle*sample_period
         min_freq = 1/max_period
         int_increment = int(np.floor(real_freq_step/min_freq))
-        quantized_search_steps = int(np.ceil((freq_search_range_hz[1] - freq_search_range_hz[0])/(min_freq*int_increment)))
-        quantized_search_step_array = np.arange(quantized_search_steps)*int_increment*min_freq
-        print(f"Conducting freq search across {quantized_search_steps} steps, seaching at {quantized_search_step_array} threshold: {TRACKING_THRESHOLD}")
+        quantized_start = int(np.floor(freq_search_range_hz[0]/(min_freq)))
+        quantized_stop = int(np.ceil(freq_search_range_hz[1])/min_freq)
+        quantized_search_steps = int(np.ceil((quantized_stop - quantized_start)/(int_increment)))+1
+        quantized_search_step_array = ((np.arange(quantized_search_steps)*int_increment)+quantized_start)*min_freq
+        print(f"Conducting freq search across {quantized_search_steps} steps, starting {quantized_start} int intcrement {int_increment} searching at {quantized_search_step_array} threshold: {TRACKING_THRESHOLD}")
 
     else:
         if GATE:
@@ -297,8 +299,14 @@ async def test_um_system(dut):
         unpacked_bits = np.unpackbits(np.fromfile(input_filename, dtype="uint8"))
         i_chan_quantised = np.array((unpacked_bits[0::2]*-2)+1,dtype="int8")
         q_chan_quantised = np.array((unpacked_bits[1::2]*-2)+1,dtype="int8")
-        test_samples = np.shape(i_chan_quantised)[0]
-        print(f"Real input file num samples: {test_samples}")
+        if("REAL_SAMPLES" in os.environ):
+            test_samples = int(os.environ['REAL_SAMPLES'])
+            print(f"Using Environment REAL_SAMPLES: {test_samples}")
+        else:
+            test_samples = np.shape(i_chan_quantised)[0]
+            print(f"Real input file num samples: {test_samples}")
+
+        
         
     else:
         (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data(num_svs_range=num_svs_range, snr_range_db=snr_range_db, code_phase_error_range=code_phase_error_range, freq_error_range_hz=freq_error_range_hz, sv_search_range=sv_search_range)
@@ -311,7 +319,7 @@ async def test_um_system(dut):
     if REAL:
         #calculated start step and count phase increments from provided values
 
-        start_cmd_val = 0x82000000
+        start_cmd_val = 0x82000000 | ((quantized_start & 0xFFFF) << 8)
         inc_cmd_val = 0x83000000 | ((int_increment & 0xFF) << 8)
         count_cmd_val = 0x84000000 | ((quantized_search_steps & 0xFF) << 8)
         print(hex(count_cmd_val))
