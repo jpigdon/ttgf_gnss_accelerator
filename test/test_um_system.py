@@ -65,12 +65,23 @@ if "REAL" in os.environ:
     else:
         real_freq_step = 200
 
-    if("REAL_TRACK_THRESH" in os.environ):
-        real_track_thresh = int(os.environ['REAL_TRACK_THRESH'])
-    else:
-        real_track_thresh  = 10000
-    TRACKING_THRESHOLD = real_track_thresh
+if("TRACK_THRESH" in os.environ):
+    real_track_thresh = int(os.environ['TRACK_THRESH'])
+else:
+    real_track_thresh  = 10000
+TRACKING_THRESHOLD = real_track_thresh
 
+TRACK_ALIGN = False
+if "TRACK_ALIGN" in os.environ:
+    track_align_val = int(os.environ['TRACK_ALIGN'])
+    TRACK_ALIGN = True
+else:
+    track_align_val = 0
+
+PHASE_ROT=False
+if "PHASE_ROT" in os.environ:
+    PHASE_ROT=True
+    phase_rot_val = float(os.environ['PHASE_ROT'])
 
 async def reset(dut):
     dut.rst_n.value = 0
@@ -161,11 +172,11 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                         #print(f"E I: {tracking_results[0][track_chan_idx]} E Q: {tracking_results[1][track_chan_idx]} /M I: {tracking_results[2][track_chan_idx]} M Q: {tracking_results[3][track_chan_idx]} /L I: {tracking_results[4][track_chan_idx]}  L Q: {tracking_results[5][track_chan_idx]} ")
                         if((early_pow > mid_pow) and (mid_pow > late_pow)):
                             new_timings[track_chan_idx] = tracking_time[track_chan_idx]-1
-                            print(f"Early Power greater than mid power and late power, retarding timing old {tracking_time[track_chan_idx]} new timing {new_timings[track_chan_idx]}")
+                            print(f"Early Power {early_pow} greater than mid power {mid_pow} and late power {late_pow}, retarding timing old {tracking_time[track_chan_idx]} new timing {new_timings[track_chan_idx]}")
                         else:
                             if((late_pow > mid_pow) and (mid_pow > early_pow)):
                                 new_timings[track_chan_idx] = tracking_time[track_chan_idx]+1
-                                print(f"late Power greater than mid power and early power, advancing timing old {tracking_time[track_chan_idx]} new timing {new_timings[track_chan_idx]}")
+                                print(f"Late Power {late_pow} greater than mid power {mid_pow} and early power {early_pow}, advancing timing old {tracking_time[track_chan_idx]} new timing {new_timings[track_chan_idx]}")
 
             read_op_val = await spi_transaction(dut, read_op_words[j], delay_ns=read_op_delays[j])
         
@@ -200,22 +211,21 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                     tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
                     #8 for the integer part, tracking can be done in subsample accuracy, shif by 2 more to handle that
                     tracking_transaction = tracking_transaction | readback_idx << (8+2)
-                    print(f"Time write operation {hex(tracking_transaction)}")
+                    #print(f"Time write operation {hex(tracking_transaction)}")
                     read_op_val = await spi_transaction(dut, tracking_transaction, delay_ns=tracking_assignment_delay)
 
                     tracking_addr = TRACKING_BASE_ADDR + (tracking_channel_idx*TRACKING_CHAN_STRIDE) + 1
                     tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
                     tracking_transaction = tracking_transaction | ((readback_ph_step << 8) & 0x00FFFF00)
 
-                    print(f"Freq write operation {hex(tracking_transaction)}")
+                    #print(f"Freq write operation {hex(tracking_transaction)}")
                     read_op_val = await spi_transaction(dut, tracking_transaction, delay_ns=tracking_assignment_delay)
-
 
                     tracking_addr = TRACKING_BASE_ADDR + (tracking_channel_idx*TRACKING_CHAN_STRIDE) + 2
                     tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
                     tracking_transaction = tracking_transaction | (word_to_send[0] & 0x00FFFF00)
 
-                    print(f"SV write operation {hex(tracking_transaction)}")
+                    #print(f"SV write operation {hex(tracking_transaction)}")
                     read_op_val = await spi_transaction(dut, tracking_transaction, delay_ns=tracking_assignment_delay)
 
                     tracking_addr = TRACKING_CONTROL_ADDR
@@ -285,9 +295,9 @@ async def test_um_system(dut):
             test_samples = 1023*4*1028
         else:
             num_svs_range = [1, 1]
-            snr_range_db = [-10, -20]
+            snr_range_db = [20, 20]
             code_phase_error_range = [0, 1023];
-            freq_error_range_hz = [-1000, 1000];
+            freq_error_range_hz = [0, 1000];
             sv_search_range = [1, 1]
             test_samples = 1023*4*5*1028
 
@@ -297,8 +307,11 @@ async def test_um_system(dut):
     if REAL:
         taps = ca_code_gen.taps_from_sv(sv_search_range[0])
         unpacked_bits = np.unpackbits(np.fromfile(input_filename, dtype="uint8"))
+        #print(f"unpacked bits {unpacked_bits[0:40]}")
         i_chan_quantised = np.array((unpacked_bits[0::2]*-2)+1,dtype="int8")
+        #print(f"i chan samps {i_chan_quantised[0:20]}")
         q_chan_quantised = np.array((unpacked_bits[1::2]*-2)+1,dtype="int8")
+        #print(f"q chan samps {q_chan_quantised[0:20]}")
         if("REAL_SAMPLES" in os.environ):
             test_samples = int(os.environ['REAL_SAMPLES'])
             print(f"Using Environment REAL_SAMPLES: {test_samples}")
@@ -310,8 +323,15 @@ async def test_um_system(dut):
         
     else:
         (test_data_unquantised, num_svs, sv_array, target_snr_db_array, code_phase_error_array, freq_error_hz_array) = gen_synthetic_data.generate_synthetic_data(num_svs_range=num_svs_range, snr_range_db=snr_range_db, code_phase_error_range=code_phase_error_range, freq_error_range_hz=freq_error_range_hz, sv_search_range=sv_search_range)
-        i_chan_quantised = np.array(np.where(np.real(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
-        q_chan_quantised = np.array(np.where(np.imag(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
+        if PHASE_ROT:
+            rotation_cmplx = np.cos(np.radians(phase_rot_val)) + 1j*np.sin(np.radians(phase_rot_val))
+            rotated_test_data = rotation_cmplx*test_data_unquantised
+            i_chan_quantised = np.array(np.where(np.real(rotated_test_data) >= 0.0, 1,-1),dtype="int8")
+            q_chan_quantised = np.array(np.where(np.imag(rotated_test_data) >= 0.0, 1,-1),dtype="int8")
+            print(f"Phase Rotation Applied {phase_rot_val} val: {rotation_cmplx}")
+        else:
+            i_chan_quantised = np.array(np.where(np.real(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
+            q_chan_quantised = np.array(np.where(np.imag(test_data_unquantised) >= 0.0, 1,-1),dtype="int8")
         taps = ca_code_gen.taps_from_sv(sv_search_range[0])
 
     delays = [5000, 5000, 5000, 5000, 5000]
@@ -326,7 +346,7 @@ async def test_um_system(dut):
         transactions = [ 0x81000000 | (taps << 8), start_cmd_val, inc_cmd_val, count_cmd_val, 0x80000200]
     else:
         #default transactions
-        transactions = [ 0x81000000 | (taps << 8), 0x8200F600, 0x83000500, 0x84000500, 0x80000200]
+        transactions = [ 0x81000000 | (taps << 8), 0x82000000, 0x83000500, 0x84000500, 0x80000200]
 
     clock = Clock(dut.clk, int(((1/4.092)*1000000)/2)*2, unit="ps") #force divisible by two
     cocotb.start_soon(clock.start())
@@ -344,16 +364,21 @@ async def test_um_system(dut):
     await reset(dut)
     await RisingEdge(dut.clk)
         
-    for test_count in range(test_samples):
+    for test_count in range(test_samples+track_align_val):
 
         await RisingEdge(dut.clk)
         uin_val = 0x00
-        if(i_chan_quantised[test_count] == 1):
-            uin_val = 1
-      
-        if(q_chan_quantised[test_count] == 1):
-            uin_val = uin_val | (1 << 2)
-
+        if(TRACK_ALIGN):
+            if(test_count >= track_align_val):
+                if(i_chan_quantised[test_count-track_align_val] == 1):
+                    uin_val = 1
+                if(q_chan_quantised[test_count-track_align_val] == 1):
+                    uin_val = uin_val | (1 << 2)
+        else:
+            if(i_chan_quantised[test_count] == 1):
+                uin_val = 1
+            if(q_chan_quantised[test_count] == 1):
+                uin_val = uin_val | (1 << 2)
         dut.ui_in.value = uin_val
         
         #if ASSERT:
