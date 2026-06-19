@@ -61,6 +61,10 @@ architecture Behavioral of track_mgmt_sm is
     signal accu_ena  :  std_logic; --general channel enable
     signal accu_sr_ena  :  std_logic; --general channel enable
 
+    signal track_len_sel : integer range 0 to (2**TRACK_LEN_WIDTH)-1;
+    signal track_len_count : integer range 0 to (2**TRACK_LEN_WIDTH)-1;
+    signal track_len_last : std_logic;
+
     component track_complex_correlator_channel is
     generic(
         ACCU_WIDTH : integer := 16;
@@ -221,11 +225,11 @@ begin
         end case;
     end process;
 
-    process(trk_state,timing_period_strobe) is
+    process(trk_state,timing_period_strobe, track_len_last) is
     begin
         case trk_state is
             when TRACKING | PREROLLING=>
-                accu_sync <= timing_period_strobe;
+                accu_sync <= timing_period_strobe and track_len_last;
             when others=>
                 accu_sync <= '0';
         end case;
@@ -237,12 +241,23 @@ begin
             trk_state <= WAITING;
             time_match_frac <= (others => '0');
             ph_inc_load <= '0';
+            track_len_sel <= 0;
+            track_len_count <= 0;
+            track_len_last <= '1';
         elsif(rising_edge(clk)) then
             ph_inc_load <= '0';
             case trk_state is
                 when WAITING =>
                     if(trk_en = '1' and trk_update = '1') then
                         trk_state <= PREPARING;
+                        --set the selected track lenght
+                        track_len_sel <= to_integer(unsigned(trk_len_slv));
+                        track_len_count <= 0;
+                        if(to_integer(unsigned(trk_len_slv)) = 0) then
+                            track_len_last <= '1';
+                        else
+                            track_len_last <= '0';
+                        end if;
                         --this should set when the (symbol) gold code is updated
                         if(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0))) = 0) then
                             time_match_frac <= std_logic_vector(to_unsigned(OVERSAMPLE_RATIO-1, MASTER_COUNT_WIDTH_FRAC));
@@ -266,12 +281,37 @@ begin
                             trk_state <= WAITING;
                         else
                             trk_state <= PREPARING;
+                            track_len_sel <= to_integer(unsigned(trk_len_slv));
+                            track_len_count <= 0;
+                            if(to_integer(unsigned(trk_len_slv)) = 0) then
+                                track_len_last <= '1';
+                            else
+                                track_len_last <= '0';
+                            end if;
                             if(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0))) = 0) then
                                 time_match_frac <= std_logic_vector(to_unsigned(OVERSAMPLE_RATIO-1, MASTER_COUNT_WIDTH_FRAC));
                             else
                                 time_match_frac <= std_logic_vector(to_unsigned(to_integer(unsigned(time_match(MASTER_COUNT_WIDTH_FRAC-1 downto 0)))-1, MASTER_COUNT_WIDTH_FRAC));
                             end if;
-                        end if;                      
+                        end if;
+                    else
+                        if(timing_period_strobe = '1') then
+                            if(track_len_sel = 0) then
+                                track_len_last <= '1';
+                            else
+                                if(track_len_count = track_len_sel) then
+                                    track_len_count <= 0;
+                                    track_len_last <= '0';
+                                else
+                                    track_len_count <= track_len_count+1;
+                                    if(track_len_count = track_len_sel-1) then
+                                        track_len_last <= '1';
+                                    else
+                                        track_len_last <= '0';
+                                    end if;
+                                end if;
+                            end if;
+                        end if;
                     end if;
                 when others=>
                     trk_state <= WAITING;

@@ -23,7 +23,7 @@ architecture Behavioral of tt_um_jpigdon_gps_accelerator_top is
     constant OVERSAMPLE_RATIO : integer := 4;
     constant TRACK_LEN_WIDTH : integer := 2;
     constant ACCU_WIDTH : integer := 14;
-    constant ACCU_OUTPUT_WIDTH : integer := 12;
+    constant ACCU_OUTPUT_WIDTH : integer := 14;
     constant MASTER_COUNT_WIDTH_INT : integer := 10;
     constant MASTER_COUNT_WIDTH_FRAC : integer := 2;
     constant GPS_GOLD_TAPS_WIDTH : integer := 10;

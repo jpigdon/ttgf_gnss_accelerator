@@ -12,7 +12,7 @@ import ca_code_gen
 SPI_PERIOD_NS = 1000
 TRACKING_THRESHOLD = 4000
 
-TRACKING_LOOP_PERIOD = 10
+TRACKING_LOOP_PERIOD = 50
 NUM_TRACK_CHANNELS = 3
 TRACKING_CONTROL_ADDR = 9
 TRACKING_BASE_ADDR = 10
@@ -77,6 +77,11 @@ if "TRACK_ALIGN" in os.environ:
     TRACK_ALIGN = True
 else:
     track_align_val = 0
+
+TRACK_SYM_DUR = 0
+if "TRACK_SYM_DUR" in os.environ:
+    TRACK_SYM_DUR = int(os.environ['TRACK_SYM_DUR'])
+
 
 PHASE_ROT=False
 if "PHASE_ROT" in os.environ:
@@ -164,7 +169,7 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                             tracking_addr = TRACKING_BASE_ADDR + (track_chan_idx*TRACKING_CHAN_STRIDE) + emlcomplex
                             tracking_transaction = ((tracking_addr & 0x000000FF) << 24) #read operation
                             tracking_op_val = await spi_transaction(dut, tracking_transaction, delay_ns=tracking_assignment_delay)
-                            tracking_results[emlcomplex][track_chan_idx] = int.from_bytes(((tracking_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
+                            tracking_results[emlcomplex][track_chan_idx] = int.from_bytes(((tracking_op_val & 0x00003FFF)<<2).to_bytes(2),signed=True)/16
                         #evaluate eml here
                         early_pow = tracking_results[0][track_chan_idx]*tracking_results[0][track_chan_idx] + tracking_results[1][track_chan_idx]*tracking_results[1][track_chan_idx]
                         mid_pow = tracking_results[2][track_chan_idx]*tracking_results[2][track_chan_idx] + tracking_results[3][track_chan_idx]*tracking_results[3][track_chan_idx]
@@ -181,9 +186,9 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
             read_op_val = await spi_transaction(dut, read_op_words[j], delay_ns=read_op_delays[j])
         
             if(read_op_words[j] == 0x05000000):
-                readback_ival = int.from_bytes(((read_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
+                readback_ival = int.from_bytes(((read_op_val & 0x000003FFF)<<2).to_bytes(2),signed=True)/16
             elif(read_op_words[j] == 0x06000000):
-                readback_qval = int.from_bytes(((read_op_val & 0x00000FFF)<<4).to_bytes(2),signed=True)/16
+                readback_qval = int.from_bytes(((read_op_val & 0x000003FFF)<<2).to_bytes(2),signed=True)/16
             elif(read_op_words[j] == 0x07000000):
                 readback_ph_step = read_op_val & 0x0000FFFF
             else:
@@ -231,7 +236,11 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                     tracking_addr = TRACKING_CONTROL_ADDR
                     tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
                     #enable and update this channel
-                    tracking_transaction = tracking_transaction | (0x3 << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
+                    
+                    if(TRACK_SYM_DUR != 0):
+                        tracking_transaction = tracking_transaction | (((TRACK_SYM_DUR << 2) | 0x3) << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
+                    else:
+                        tracking_transaction = tracking_transaction | (0x3 << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
 
                     print(f"Tracking Control Update operation {hex(tracking_transaction)}")
                     read_op_val = await spi_transaction(dut, tracking_transaction, delay_ns=tracking_assignment_delay)
@@ -255,6 +264,12 @@ async def spi_operation(dut, num_transactions=1,delay_ns=2000, word_to_send=0x81
                 tracking_addr = TRACKING_CONTROL_ADDR
                 tracking_transaction = ((tracking_addr & 0x000000FF) << 24) | 0x80000000
                 #enable and update this channel
+                if(TRACK_SYM_DUR != 0):
+                    tracking_transaction = tracking_transaction | (((TRACK_SYM_DUR << 2) | 0x3) << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
+                else:
+                    tracking_transaction = tracking_transaction | (0x3 << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
+
+
                 tracking_transaction = tracking_transaction | (0x3 << (tracking_channel_idx*TRACKING_CONFIG_STRIDE)+8) & 0x00FFFF00
                 read_op_val = await spi_transaction(dut, tracking_transaction, delay_ns=tracking_assignment_delay)
                 print(f"Upated timing for channel: {chan_idx}")
